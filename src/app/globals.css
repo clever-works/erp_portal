@@ -118,3 +118,6 @@ button:active,summary:active{transform:scale(.98)}
 @media(max-width:1050px){.design-credit{padding-left:24px;padding-right:24px}}
 @media(max-width:760px){.design-credit{padding:0 15px 10px;text-align:center;font-size:10px}}
 @media(max-width:760px){.app,.main,.topbar,.content{min-width:0}.topbar .searchbox{min-width:0}.content>*{min-width:0}.welcome>div,.sectionhead>div{min-width:0}.grid-main>*,.bottomgrid>*,.stats>*{min-width:0}}
+.sidebar{overflow-y:auto}
+.nav{min-height:0;overflow-y:auto}
+.sidebarbottom{flex:none}
