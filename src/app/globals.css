@@ -135,3 +135,11 @@ button:active,summary:active{transform:scale(.98)}
 .attendance-summary strong{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
 .attendance-complete-note{margin:12px 0 0;color:var(--muted);font-size:11px}
 @media(max-width:760px){.attendance-summary{gap:6px}.attendance-summary>div{padding:9px 7px}.attendance-summary strong{font-size:12px}}
+.employee-profile-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px}
+.employee-profile-row .badge{margin-left:0;justify-self:end}
+.employee-dashboard-attendance,.employee-attendance-panel{display:flex;flex-direction:column;min-width:0}
+.employee-dashboard-attendance>.primary,.employee-attendance-panel>.primary{align-self:flex-end;min-width:120px;justify-content:center}
+@media(max-width:1050px){.employee-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.grid-main,.bottomgrid{grid-template-columns:minmax(0,1fr)}.employee-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.employee-stats{grid-template-columns:minmax(0,1fr)}.employee-profile-row{grid-template-columns:auto minmax(0,1fr) auto}.employee-attendance-panel>.primary,.employee-dashboard-attendance>.primary{align-self:stretch}}
+@media(max-width:420px){.employee-profile-row{grid-template-columns:auto minmax(0,1fr)}.employee-profile-row .badge{grid-column:2;grid-row:2;justify-self:start}.attendance-summary>div{padding:8px 5px}.attendance-summary span{font-size:9px}.attendance-summary strong{font-size:11px}}
