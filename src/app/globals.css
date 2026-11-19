@@ -129,3 +129,9 @@ button:active,summary:active{transform:scale(.98)}
 .setting-value .filterselect,.setting-value .filterinput{width:100%;max-width:340px;min-width:0}
 .setting-actions{display:flex;align-items:center;gap:7px}
 @media(max-width:760px){.setting-row{grid-template-columns:minmax(0,1fr) auto;gap:10px}.setting-value{grid-column:1/-1;grid-row:2}.setting-actions{grid-column:2;grid-row:1}.setting-value .filterselect,.setting-value .filterinput{max-width:none}}
+.attendance-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0}
+.attendance-summary>div{display:grid;gap:7px;min-width:0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.attendance-summary span{color:var(--muted);font-size:10px;font-weight:600}
+.attendance-summary strong{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
+.attendance-complete-note{margin:12px 0 0;color:var(--muted);font-size:11px}
+@media(max-width:760px){.attendance-summary{gap:6px}.attendance-summary>div{padding:9px 7px}.attendance-summary strong{font-size:12px}}
