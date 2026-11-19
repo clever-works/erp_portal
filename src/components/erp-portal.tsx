@@ -129,7 +129,7 @@ export default function ERPPortal() {
   if (!hydrated) return <div className="auth-loading" aria-label="Loading workspace">Loading workspace…</div>;
   if (!authUser) return <LoginScreen email={loginEmail} password={loginPassword} error={loginError} onEmailChange={setLoginEmail} onPasswordChange={setLoginPassword} onSubmit={signIn} onDemoFill={(user) => { setLoginEmail(user.email); setLoginPassword(user.password); setLoginError(""); }} />;
 
-  return <div className={`app ${dark ? "dark" : ""}`}>
+  return <div className={`app ${dark ? "dark" : ""} ${employeeMode ? "employee-mode" : "admin-mode"}`}>
     <aside className="sidebar">
       <div className="brand"><div className="brandmark"><BriefcaseBusiness size={18}/></div><div className="brandname">nexus<span style={{ color: "#13a88a" }}>.</span><small>WORKSPACE</small></div></div>
       <div className="navlabel">WORKSPACE</div><nav className="nav" aria-label="Workspace navigation">{navItems.map(({ label, icon: Icon, count }) => <button key={label} className={page === label ? "active" : ""} aria-current={page === label ? "page" : undefined} onClick={() => switchPage(label)}><Icon size={16} aria-hidden="true"/>{label}{count && !employeeMode && <span className="count" aria-label={`${leaves.filter((leave) => leave.status === "Pending").length} pending requests`}>{leaves.filter((leave) => leave.status === "Pending").length}</span>}</button>)}</nav>
