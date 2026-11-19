@@ -143,4 +143,15 @@ button:active,summary:active{transform:scale(.98)}
 @media(max-width:900px){.grid-main,.bottomgrid{grid-template-columns:minmax(0,1fr)}.employee-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:760px){.employee-stats{grid-template-columns:minmax(0,1fr)}.employee-profile-row{grid-template-columns:auto minmax(0,1fr) auto}.employee-attendance-panel>.primary,.employee-dashboard-attendance>.primary{align-self:stretch}}
 @media(max-width:420px){.employee-profile-row{grid-template-columns:auto minmax(0,1fr)}.employee-profile-row .badge{grid-column:2;grid-row:2;justify-self:start}.attendance-summary>div{padding:8px 5px}.attendance-summary span{font-size:9px}.attendance-summary strong{font-size:11px}}
+.dashboard-leave-item{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;column-gap:12px;padding:12px;margin:9px 0 0;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+.dashboard-leave-item>.miniavatar{grid-column:1;grid-row:1}
+.leave-identity{grid-column:2;grid-row:1;min-width:0}
+.leave-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.leave-identity small{margin-top:5px;line-height:1.35;white-space:normal}
+.leave-controls{grid-column:3;grid-row:1;display:flex;align-items:center;gap:4px}
+.leave-controls .badge{white-space:nowrap}
+.leave-controls .linkbtn{width:28px;height:28px;display:grid;place-items:center;border-radius:6px}
+.leave-controls .linkbtn:hover{background:var(--soft)}
+.leave-controls .reject-leave{color:#c45e56}
+@media(max-width:420px){.dashboard-leave-item{grid-template-columns:32px minmax(0,1fr);gap:10px;padding:10px}.leave-controls{grid-column:2;grid-row:2;justify-self:start}.leave-identity{grid-column:2;grid-row:1}.dashboard-leave-item>.miniavatar{grid-column:1;grid-row:1 / span 2}}
 .admin-mode .paneltitle h2{font-size:16px;line-height:1.3;letter-spacing:-.2px;font-weight:750}
