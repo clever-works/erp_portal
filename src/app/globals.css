@@ -120,3 +120,12 @@ button:active,summary:active{transform:scale(.98)}
 .sidebar{overflow-y:auto}
 .nav{min-height:0;overflow-y:auto}
 .sidebarbottom{flex:none}
+.settings-list{display:grid}
+.setting-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) auto;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.setting-row:last-child{border-bottom:0;padding-bottom:0}
+.setting-label h3{margin:0;color:var(--text);font-size:12px;font-weight:650}
+.setting-label p{margin:5px 0 0;color:var(--muted);font-size:11px}
+.setting-value{color:var(--text);font-size:12px}
+.setting-value .filterselect,.setting-value .filterinput{width:100%;max-width:340px;min-width:0}
+.setting-actions{display:flex;align-items:center;gap:7px}
+@media(max-width:760px){.setting-row{grid-template-columns:minmax(0,1fr) auto;gap:10px}.setting-value{grid-column:1/-1;grid-row:2}.setting-actions{grid-column:2;grid-row:1}.setting-value .filterselect,.setting-value .filterinput{max-width:none}}
