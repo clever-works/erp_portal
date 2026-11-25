@@ -1,73 +1,88 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type FormEvent } from "react";
-import { Activity, ArrowDownRight, ArrowUpRight, Bell, BriefcaseBusiness, Building2, CalendarDays, Check, CheckCheck, ChevronDown, CircleHelp, Clock3, Download, FileText, FolderKanban, LayoutDashboard, Menu, Moon, MoreHorizontal, Package, Plus, Search, Settings, Sun, Users, Wallet, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { Download, Megaphone, Plus } from "lucide-react";
+import { avatarTints, demoUsers, employeeNavLabels, legacyLogins, legacyPeople, nav, navGroups, seedAnnouncements, seedDepartments, seedEmployees, seedLeaves, seedNotices, seedPersonalLeave, seedWfhRequests, withEmployeeDefaults } from "@/lib/data";
+import type { Announcement, Department, DemoUser, Employee, EmployeeAttendance, InboxNotice, Leave, NewEmployee, PersonalLeave, ProfileTarget, WfhRequest } from "@/lib/types";
+import { formatRange, remoteOverrides } from "@/lib/wfh";
+import { setRemoteDays } from "@/lib/attendance";
+import WfhRequestsPanel from "@/components/wfh/WfhRequestsPanel";
+import MyWfhPanel, { type WfhDraft } from "@/components/wfh/MyWfhPanel";
+import { audienceLabel, noticeVisibleTo, reaches } from "@/lib/audience";
+import AddDepartmentModal from "@/components/departments/AddDepartmentModal";
+import AnnouncementComposer, { type AnnouncementDraft } from "@/components/announcements/AnnouncementComposer";
+import AnnouncementFeed from "@/components/announcements/AnnouncementFeed";
+import { downloadCsv, formatAttendanceTime, initialsOf, localDateKey, migratePerson, pageDescription } from "@/lib/utils";
+import { grossOf } from "@/lib/payroll";
+import SalaryPanel from "@/components/payroll/SalaryPanel";
 
-type Employee = { id: string; name: string; email: string; department: string; role: string; status: string; initials: string; color: string };
-type DemoUser = { email: string; password: string; name: string; role: "admin" | "employee"; department: string; jobTitle: string; initials: string; employeeId: string };
-type Leave = { name: string; kind: string; dates: string; initials: string; color: string; status: string };
-type InboxNotice = { id: number; title: string; body: string; time: string; page: string; read: boolean };
-type EmployeeAttendance = { date: string; checkInAt: string; checkOutAt: string | null };
-const seedNotices: InboxNotice[] = [
-  { id: 1, title: "Leave requests need review", body: "Demi Wilkinson and 2 others are waiting for approval.", time: "10 min ago", page: "Leave management", read: false },
-  { id: 2, title: "Project milestone coming up", body: "Website redesign is due for review this Friday.", time: "1 hour ago", page: "Projects", read: false },
-  { id: 3, title: "Attendance needs attention", body: "6 team members arrived after the scheduled start.", time: "Today", page: "Attendance", read: false },
-  { id: 4, title: "New company announcement", body: "Q4 all-hands meeting details are now available.", time: "Yesterday", page: "Announcements", read: true },
-];
-const seedEmployees: Employee[] = [
-  { id: "EMP-1042", name: "Olivia Rhye", email: "olivia@acme.co", department: "Design", role: "Product Designer", status: "Active", initials: "OR", color: "#e8effb" },
-  { id: "EMP-1038", name: "Phoenix Baker", email: "phoenix@acme.co", department: "Engineering", role: "Engineering Lead", status: "Active", initials: "PB", color: "#f5eaf1" },
-  { id: "EMP-1035", name: "Lana Steiner", email: "lana@acme.co", department: "Marketing", role: "Marketing Manager", status: "Active", initials: "LS", color: "#f8eee1" },
-  { id: "EMP-1029", name: "Demi Wilkinson", email: "demi@acme.co", department: "Human Resources", role: "HR Specialist", status: "On leave", initials: "DW", color: "#e9f2ed" },
-  { id: "EMP-1024", name: "Candice Wu", email: "candice@acme.co", department: "Engineering", role: "Software Engineer", status: "Active", initials: "CW", color: "#f2eafa" },
-];
-const seedLeaves: Leave[] = [
-  { name: "Demi Wilkinson", kind: "Annual leave", dates: "Oct 24 – 26", initials: "DW", color: "#e9f2ed", status: "Pending" },
-  { name: "Candice Wu", kind: "Sick leave", dates: "Oct 25", initials: "CW", color: "#f2eafa", status: "Pending" },
-  { name: "Natali Craig", kind: "Annual leave", dates: "Oct 28 – Nov 1", initials: "NC", color: "#e6eff6", status: "Pending" },
-];
-const demoUsers: DemoUser[] = [
-  { email: "admin@acme.co", password: "Admin123!", name: "Alex Rivera", role: "admin", department: "Operations", jobTitle: "Super Admin", initials: "AR", employeeId: "EMP-1001" },
-  { email: "jamie.chen@acme.co", password: "Employee123!", name: "Jamie Chen", role: "employee", department: "Design", jobTitle: "Product Designer", initials: "JC", employeeId: "EMP-1042" },
-];
-const employeeNavLabels = ["Dashboard", "Attendance", "Leave management", "Tasks", "Documents", "Announcements"];
-const nav = [
-  { label: "Dashboard", icon: LayoutDashboard }, { label: "Employees", icon: Users }, { label: "Departments", icon: Building2 }, { label: "Attendance", icon: Clock3 }, { label: "Leave management", icon: CalendarDays, count: "3" }, { label: "Tasks", icon: CheckCheck }, { label: "Projects", icon: FolderKanban }, { label: "Documents", icon: FileText }, { label: "Inventory", icon: Package }, { label: "Finance", icon: Wallet }, { label: "Announcements", icon: Bell }, { label: "Reports", icon: Activity }, { label: "Settings", icon: Settings },
-];
-const taskData = [{ name: "Q4 brand guidelines", group: "Design team", done: 72, status: "In progress", color: "progress" }, { name: "Mobile app redesign", group: "Product team", done: 48, status: "In progress", color: "progress" }, { name: "October payroll review", group: "Finance team", done: 100, status: "Completed", color: "completed" }, { name: "Website accessibility audit", group: "Engineering", done: 23, status: "In progress", color: "progress" }];
+import Sidebar from "@/components/layout/Sidebar";
+import Topbar from "@/components/layout/Topbar";
+import { MobileDrawer, MobileTabBar } from "@/components/layout/MobileNav";
+import SectionTabs from "@/components/layout/SectionTabs";
+import PageHeader from "@/components/ui/PageHeader";
+import Toast from "@/components/ui/Toast";
+import LoginScreen from "@/components/auth/LoginScreen";
+import AdminDashboard from "@/components/dashboard/AdminDashboard";
+import EmployeeDashboard from "@/components/dashboard/EmployeeDashboard";
+import EmployeeDirectory from "@/components/employees/EmployeeDirectory";
+import AddEmployeeModal from "@/components/employees/AddEmployeeModal";
+import ProfileModal from "@/components/employees/ProfileModal";
+import LeaveRequestsPanel from "@/components/leave/LeaveRequestsPanel";
+import EmployeeLeavePanel from "@/components/leave/EmployeeLeavePanel";
+import TeamAttendancePanel from "@/components/attendance/TeamAttendancePanel";
+import EmployeeAttendancePanel from "@/components/attendance/EmployeeAttendancePanel";
+import SettingsPanel from "@/components/settings/SettingsPanel";
+import ModulePanel from "@/components/modules/ModulePanel";
 
+type SavedState = { employees?: Employee[]; leaves?: Leave[]; dark?: boolean; checkedIn?: boolean; employeeCheckedIn?: boolean; employeeAttendance?: EmployeeAttendance | null; employeeLeave?: PersonalLeave[]; notices?: InboxNotice[]; departments?: Department[]; announcements?: Announcement[]; wfhRequests?: WfhRequest[] };
+
+/**
+ * App shell: holds the portal state (saved to localStorage), handles sign-in,
+ * and decides which page component to show. All UI lives in the imported components.
+ */
 export default function ERPPortal() {
-  const [page, setPage] = useState("Dashboard");
-  const [query, setQuery] = useState("");
-  const [employees, setEmployees] = useState(seedEmployees);
-  const [leaves, setLeaves] = useState(seedLeaves);
-  const [dark, setDark] = useState(false);
-  const [toast, setToast] = useState("");
-  const [modal, setModal] = useState(false);
-  const [menu, setMenu] = useState(false);
-  const [activePanel, setActivePanel] = useState<"notifications" | "profile" | null>(null);
-  const [profileView, setProfileView] = useState<Employee | "alex" | null>(null);
-  const [notices, setNotices] = useState(seedNotices);
-  const [nameInput, setNameInput] = useState("");
-  const [deptInput, setDeptInput] = useState("Design");
-  const [filter, setFilter] = useState("All employees");
-  const [checkedIn, setCheckedIn] = useState(false);
+  /* ---------- state ---------- */
   const [hydrated, setHydrated] = useState(false);
   const [authUser, setAuthUser] = useState<DemoUser | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [employeeLeave, setEmployeeLeave] = useState([{ kind: "Annual leave", dates: "Nov 18 – 20", status: "Approved" }, { kind: "Personal day", dates: "Dec 04", status: "Pending" }]);
+
+  const [page, setPage] = useState("Dashboard");
+  const [menu, setMenu] = useState(false);
+  const [dark, setDark] = useState(false);
+  const [toast, setToast] = useState("");
+  const [addingEmployee, setAddingEmployee] = useState(false);
+  const [addingDepartment, setAddingDepartment] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [profileView, setProfileView] = useState<ProfileTarget | null>(null);
+  const [departments, setDepartments] = useState(seedDepartments);
+  const [announcements, setAnnouncements] = useState(seedAnnouncements);
+  const [wfhRequests, setWfhRequests] = useState<WfhRequest[]>(seedWfhRequests);
+
+  const [employees, setEmployees] = useState(seedEmployees);
+  const [leaves, setLeaves] = useState(seedLeaves);
+  const [notices, setNotices] = useState(seedNotices);
+  const [checkedIn, setCheckedIn] = useState(false);
+  const [employeeLeave, setEmployeeLeave] = useState(seedPersonalLeave);
   const [employeeCheckedIn, setEmployeeCheckedIn] = useState(false);
   const [employeeAttendance, setEmployeeAttendance] = useState<EmployeeAttendance | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+
+  /* ---------- persistence ---------- */
   useEffect(() => {
     try {
       const stored = localStorage.getItem("nexus-erp");
       if (stored) {
-        const state = JSON.parse(stored) as { employees?: Employee[]; leaves?: Leave[]; dark?: boolean; checkedIn?: boolean; employeeCheckedIn?: boolean; employeeAttendance?: EmployeeAttendance | null; employeeLeave?: typeof employeeLeave; notices?: InboxNotice[] };
-        if (state.employees) setEmployees(state.employees);
-        if (state.leaves) setLeaves(state.leaves);
+        const state = JSON.parse(stored) as SavedState;
+        if (state.employees) {
+          // Rename old demo names, fill in new fields (phone, salary, insurance…), and add new seed people.
+          const saved = state.employees.map((person) => withEmployeeDefaults(migratePerson(person, legacyPeople)));
+          const missing = seedEmployees.filter((seed) => !saved.some((person) => person.id === seed.id));
+          setEmployees([...missing, ...saved]);
+        }
+        if (state.leaves) setLeaves(state.leaves.map((leave) => migratePerson(leave, legacyPeople)));
         const savedTheme = localStorage.getItem("nexus-theme");
         setDark(savedTheme ? savedTheme === "dark" : !!state.dark);
         setCheckedIn(!!state.checkedIn);
@@ -76,26 +91,115 @@ export default function ERPPortal() {
         setEmployeeAttendance(attendance);
         setEmployeeCheckedIn(!!attendance && attendance.date === today && !attendance.checkOutAt);
         if (state.employeeLeave) setEmployeeLeave(state.employeeLeave);
-        if (state.notices) setNotices(state.notices);
-      } else { setDark(localStorage.getItem("nexus-theme") === "dark"); }
-      const signedInEmail = localStorage.getItem("nexus-auth");
-      if (signedInEmail) setAuthUser(demoUsers.find((user) => user.email === signedInEmail) ?? null);
+        if (state.departments) setDepartments(state.departments);
+        if (state.announcements) setAnnouncements(state.announcements);
+        if (state.wfhRequests) setWfhRequests(state.wfhRequests);
+        if (state.notices) setNotices(state.notices.map((notice) => ({ ...notice, body: Object.entries(legacyPeople).reduce((body, [oldName, person]) => body.replaceAll(oldName, person.name), notice.body) })));
+      } else {
+        setDark(localStorage.getItem("nexus-theme") === "dark");
+      }
+      const savedEmail = localStorage.getItem("nexus-auth");
+      const signedInEmail = savedEmail ? legacyLogins[savedEmail] ?? savedEmail : null;
+      if (signedInEmail) { setAuthUser(demoUsers.find((user) => user.email === signedInEmail) ?? null); localStorage.setItem("nexus-auth", signedInEmail); }
     } catch { /* use demo defaults */ } finally { setHydrated(true); }
   }, []);
-  useEffect(() => { if (!hydrated) return; localStorage.setItem("nexus-erp", JSON.stringify({ employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices })); }, [employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("nexus-erp", JSON.stringify({ employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, departments, announcements, wfhRequests }));
+  }, [employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, departments, announcements, wfhRequests, hydrated]);
+
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 2600); return () => clearTimeout(timer); }, [toast]);
-  useEffect(() => { if (!modal && !profileView && returnFocusRef.current) { returnFocusRef.current.focus(); returnFocusRef.current = null; } }, [modal, profileView]);
-  const filteredEmployees = useMemo(() => employees.filter((person) => `${person.name} ${person.email} ${person.department} ${person.role}`.toLowerCase().includes(query.toLowerCase()) && (filter === "All employees" || person.status === filter)), [employees, query, filter]);
+  useEffect(() => { if (!addingEmployee && !addingDepartment && !composing && !profileView && returnFocusRef.current) { returnFocusRef.current.focus(); returnFocusRef.current = null; } }, [addingEmployee, addingDepartment, composing, profileView]);
+  useEffect(() => { document.documentElement.classList.toggle("dark-root", dark); }, [dark]);
+
+  /* ---------- actions ---------- */
   const notify = (message: string) => setToast(message);
+  const employeeMode = authUser?.role === "employee";
+
+  const signIn = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const account = demoUsers.find((user) => user.email.toLowerCase() === loginEmail.trim().toLowerCase() && user.password === loginPassword);
+    if (!account) { setLoginError("Email or password is incorrect."); return; }
+    setAuthUser(account); setPage("Dashboard"); setLoginError(""); setLoginPassword("");
+    localStorage.setItem("nexus-auth", account.email);
+  };
+  const signOut = () => { localStorage.removeItem("nexus-auth"); setAuthUser(null); setProfileView(null); setPage("Dashboard"); setLoginPassword(""); };
+
+  const saveTheme = (nextDark: boolean) => { try { localStorage.setItem("nexus-theme", nextDark ? "dark" : "light"); } catch { /* theme still changes for this session */ } setDark(nextDark); };
+
+  const switchPage = (value: string) => {
+    if (employeeMode ? !employeeNavLabels.includes(value) : nav.find((item) => item.label === value)?.employeeOnly) return;
+    setPage(value); setMenu(false);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(".content h1")?.focus());
+  };
+
+  const openAddEmployee = (event: MouseEvent<HTMLButtonElement>) => { returnFocusRef.current = event.currentTarget; setAddingEmployee(true); };
+  const createEmployee = (draft: NewEmployee) => {
+    const nextNumber = Math.max(1050, ...employees.map((e) => Number(e.id.replace(/\D/g, "")) || 0)) + 1;
+    setEmployees([{ ...draft, id: `EMP-${nextNumber}`, email: `${draft.name.toLowerCase().replace(/\s+/g, ".")}@acme.co`, status: "Active", initials: initialsOf(draft.name), color: avatarTints[employees.length % avatarTints.length] }, ...employees]);
+    setAddingEmployee(false); notify("Employee added successfully");
+  };
+  const createDepartment = (department: Department) => {
+    setDepartments([...departments, department]); setAddingDepartment(false);
+    notify(`${department.name} department added`);
+  };
+  const publishAnnouncement = (draft: AnnouncementDraft) => {
+    const now = new Date().toISOString();
+    const id = Date.now();
+    setAnnouncements([{ ...draft, id, publishedAt: now, author: authUser?.name ?? "Admin" }, ...announcements]);
+    setNotices([{ id, title: draft.title, body: draft.body.length > 110 ? `${draft.body.slice(0, 107)}…` : draft.body, time: "Just now", createdAt: now, page: "Announcements", read: false, audience: draft.audience, fromAnnouncement: true }, ...notices]);
+    setComposing(false);
+    notify(`Announcement sent to ${audienceLabel(draft.audience)}`);
+  };
+  const submitWfh = (draft: WfhDraft) => {
+    const me = employees.find((e) => e.id === authUser?.employeeId);
+    if (!me) return;
+    const now = new Date().toISOString(); const id = Date.now();
+    setWfhRequests([{ ...draft, id, employeeId: me.id, name: me.name, initials: me.initials, color: me.color, status: "Pending", requestedAt: now }, ...wfhRequests]);
+    setNotices([{ id, title: "Work from home request", body: `${me.name} asked to work from home ${formatRange(draft.start, draft.end)}.`, time: "Just now", createdAt: now, page: "Work from home", read: false, audience: "admin" }, ...notices]);
+    notify("Work from home request sent");
+  };
+  const decideWfh = (id: number, status: "Approved" | "Rejected") => {
+    const request = wfhRequests.find((r) => r.id === id);
+    if (!request) return;
+    setWfhRequests(wfhRequests.map((r) => (r.id === id ? { ...r, status } : r)));
+    const now = new Date().toISOString();
+    setNotices([{ id: Date.now(), title: `Work from home ${status.toLowerCase()}`, body: `Your request for ${formatRange(request.start, request.end)} was ${status.toLowerCase()}.`, time: "Just now", createdAt: now, page: "Work from home", read: false, employeeId: request.employeeId }, ...notices]);
+    notify(`${request.name}'s request ${status.toLowerCase()}`);
+  };
+  const exportEmployees = () => {
+    downloadCsv("nexus-employees.csv",
+      ["Employee ID", "Name", "Email", "Phone", "Extension", "Department", "Job title", "Work mode", "Basic (SAR)", "Housing (SAR)", "Transport (SAR)", "Other (SAR)", "Gross (SAR)", "Insurance provider", "Insured company", "Status"],
+      employees.map((e) => [e.id, e.name, e.email, e.phone, e.extension, e.department, e.role, e.workMode, ...[e.salary.basic, e.salary.housing, e.salary.transport, e.salary.other, grossOf(e.salary)].map(String), e.insurance.provider, e.insurance.insuredCompany, e.status]));
+    notify("Employee list exported");
+  };
+  const updateLeave = (index: number, status: string) => {
+    const target = leaves[index];
+    setLeaves(leaves.map((item, i) => i === index ? { ...item, status } : item));
+    // Requests an employee sent from their portal carry an id: update their own copy too.
+    if (target?.id) setEmployeeLeave(employeeLeave.map((item) => item.id === target.id ? { ...item, status } : item));
+    notify(`Leave request ${status.toLowerCase()}`);
+  };
+  const submitLeave = (request: PersonalLeave) => {
+    const me = employees.find((e) => e.id === authUser?.employeeId);
+    const id = Date.now();
+    setEmployeeLeave([{ ...request, id }, ...employeeLeave]);
+    if (me) {
+      setLeaves([{ id, name: me.name, kind: request.kind, dates: request.dates, initials: me.initials, color: me.color, status: "Pending", late: request.late }, ...leaves]);
+      setNotices([{ id, title: request.late ? "Late sick leave submitted" : "New leave request", body: `${me.name} requested ${request.kind.toLowerCase()} for ${request.dates}.`, time: "Just now", createdAt: new Date().toISOString(), page: "Leave management", read: false, audience: "admin" }, ...notices]);
+    }
+    notify(request.late ? "Sick leave submitted (marked as late)" : "Your leave request was submitted");
+  };
+
   const toggleEmployeeAttendance = () => {
     const now = new Date();
     const today = localDateKey(now);
     const session = employeeAttendance?.date === today ? employeeAttendance : null;
     if (employeeCheckedIn && session) {
       const completed = { ...session, checkOutAt: now.toISOString() };
-      setEmployeeAttendance(completed);
-      setEmployeeCheckedIn(false);
-      notify(`Checked out at ${formatAttendanceTime(completed.checkOutAt!)}`);
+      setEmployeeAttendance(completed); setEmployeeCheckedIn(false);
+      notify(`Checked out at ${formatAttendanceTime(completed.checkOutAt)}`);
       return;
     }
     if (session?.checkOutAt) { notify("Your workday is already complete"); return; }
@@ -103,141 +207,91 @@ export default function ERPPortal() {
     setEmployeeCheckedIn(true);
     notify(`Checked in at ${formatAttendanceTime(now.toISOString())}`);
   };
-  const signIn = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const account = demoUsers.find((user) => user.email.toLowerCase() === loginEmail.trim().toLowerCase() && user.password === loginPassword); if (!account) { setLoginError("Email or password is incorrect."); return; } setAuthUser(account); setPage("Dashboard"); setLoginError(""); setLoginPassword(""); localStorage.setItem("nexus-auth", account.email); };
-  const signOut = () => { localStorage.removeItem("nexus-auth"); setAuthUser(null); setProfileView(null); setActivePanel(null); setPage("Dashboard"); setLoginPassword(""); };
-  const toggleTheme = () => { const next = !dark; try { localStorage.setItem("nexus-theme", next ? "dark" : "light"); } catch { /* theme still changes for this session */ } setDark(next); };
-  const createEmployee = () => { if (!nameInput.trim()) return; const initials = nameInput.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase(); setEmployees([{ id: `EMP-${1043 + employees.length}`, name: nameInput.trim(), email: `${nameInput.toLowerCase().replaceAll(" ", ".")}@acme.co`, department: deptInput, role: "Team member", status: "Active", initials, color: "#e8effb" }, ...employees]); setNameInput(""); setModal(false); notify("Employee added successfully"); };
-  const updateLeave = (index: number, status: string) => { setLeaves(leaves.map((item, i) => i === index ? { ...item, status } : item)); notify(`Leave request ${status.toLowerCase()}`); };
-  const downloadCsv = () => { const csv = ["Employee ID,Name,Email,Department,Job title,Status", ...employees.map((e) => [e.id, e.name, e.email, e.department, e.role, e.status].map((v) => `"${v}"`).join(","))].join("\n"); const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = "nexus-employees.csv"; anchor.click(); URL.revokeObjectURL(url); notify("Employee list exported"); };
-  const switchPage = (value: string) => { if (authUser?.role === "employee" && !employeeNavLabels.includes(value)) return; setPage(value); setMenu(false); setQuery(""); requestAnimationFrame(() => document.querySelector<HTMLElement>(".content h1")?.focus()); };
-  const openEmployeeModal = (event: MouseEvent<HTMLButtonElement>) => { returnFocusRef.current = event.currentTarget; setModal(true); };
-  const title = page === "Leave management" ? "Leave Management" : page;
-  const navItems = authUser?.role === "employee" ? nav.filter((item) => employeeNavLabels.includes(item.label)) : nav;
-  const currentProfile: Employee | "alex" = authUser?.role === "employee" ? { id: authUser.employeeId, name: authUser.name, email: authUser.email, department: authUser.department, role: authUser.jobTitle, status: "Active", initials: authUser.initials, color: "#e8effb" } : "alex";
-  const employeeMode = authUser?.role === "employee";
-  const todayEmployeeAttendance = employeeAttendance?.date === localDateKey(new Date()) ? employeeAttendance : null;
-  const visibleNotices = employeeMode ? notices.filter((item) => ["Projects", "Announcements"].includes(item.page)) : notices;
 
-  const renderPageContent = () => {
-    if (page === "Employees") return <><div className="filters"><label className="searchbox" style={{ margin: 0, width: 250 }}><Search size={14}/><input aria-label="Search employees" placeholder="Search employees..." value={query} onChange={(e) => setQuery(e.target.value)}/></label><select className="filterselect" aria-label="Filter employees by status" value={filter} onChange={(e) => setFilter(e.target.value)}><option>All employees</option><option>Active</option><option>On leave</option></select><span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted)" }}>{filteredEmployees.length} team members</span></div><section className="card panel"><EmployeeTable employees={filteredEmployees} onSelect={setProfileView}/>{filteredEmployees.length === 0 && <div className="emptystate">No employees match your search.</div>}</section></>;
-    if (page === "Leave management") return employeeMode ? <EmployeeLeavePanel leaves={employeeLeave} onSubmit={(request) => { setEmployeeLeave([request, ...employeeLeave]); notify("Your leave request was submitted"); }}/> : <section className="card panel"><div className="paneltitle"><div><h2>All leave requests</h2><p>Review requests from across your organization</p></div><select className="filterselect" aria-label="Filter leave requests by status"><option>All statuses</option><option>Pending</option><option>Approved</option><option>Rejected</option></select></div>{leaves.map((leave, i) => <div className="leaveitem" key={`${leave.name}-${i}`}><div className="miniavatar" style={{ background: leave.color }}>{leave.initials}</div><div style={{ flex: 1 }}><strong>{leave.name}</strong><small>{leave.kind} · {leave.dates}</small></div><span className={`badge ${leave.status.toLowerCase()}`}>{leave.status}</span>{leave.status === "Pending" && <><button className="outline" onClick={() => updateLeave(i, "Approved")}><Check size={13}/> Approve</button><button className="outline" onClick={() => updateLeave(i, "Rejected")}><X size={13}/> Reject</button></>}</div>)}</section>;
-    if (page === "Attendance") return employeeMode ? <EmployeeAttendancePanel user={authUser!} checkedIn={employeeCheckedIn} attendance={todayEmployeeAttendance} onToggle={toggleEmployeeAttendance}/> : <AttendancePanel checkedIn={checkedIn} setCheckedIn={setCheckedIn} notify={notify}/>;
-    if (page === "Settings") return <SettingsPanel dark={dark} onThemeChange={(mode) => { const nextDark = mode === "Dark" || (mode === "System default" && window.matchMedia("(prefers-color-scheme: dark)").matches); setDark(nextDark); localStorage.setItem("nexus-theme", nextDark ? "dark" : "light"); }} notify={notify}/>;
-    return <ModulePanel page={page} notify={notify} employeeMode={!!employeeMode}/>;
+  /* ---------- signed-out / loading ---------- */
+  if (!hydrated) return <div className="auth-loading" aria-label="Loading workspace"><span className="spinner" aria-hidden="true" />Loading workspace…</div>;
+  if (!authUser) return <LoginScreen dark={dark} email={loginEmail} password={loginPassword} error={loginError} onEmailChange={setLoginEmail} onPasswordChange={setLoginPassword} onSubmit={signIn} onDemoFill={(user) => { setLoginEmail(user.email); setLoginPassword(user.password); setLoginError(""); }} />;
+
+  /* ---------- derived ---------- */
+  const title = page === "Leave management" ? "Leave Management" : page === "My salary" ? "My Salary" : page;
+  const allowed = (item: { label: string; employeeOnly?: boolean }) => employeeMode ? employeeNavLabels.includes(item.label) : !item.employeeOnly;
+  const navItems = nav.filter(allowed);
+  const visibleGroups = navGroups.map((group) => ({ ...group, items: group.items.filter(allowed) })).filter((group) => group.items.length);
+  const myRecord = employees.find((person) => person.id === authUser.employeeId) ?? withEmployeeDefaults({ id: authUser.employeeId, name: authUser.name });
+  const pendingCount = leaves.filter((leave) => leave.status === "Pending").length;
+  const badges = employeeMode ? {} : { leave: pendingCount, wfh: wfhRequests.filter((r) => r.status === "Pending").length };
+  const visibleNotices = notices.filter((notice) => noticeVisibleTo(notice, authUser.role, myRecord.department, myRecord.id));
+  setRemoteDays(remoteOverrides(wfhRequests));
+  const myAnnouncements = employeeMode ? announcements.filter((item) => reaches(item.audience, myRecord.department)) : announcements;
+  const departmentNames = departments.map((dept) => dept.name);
+  const departmentDataset = {
+    columns: ["Department", "Department head", "Team size", "Annual budget", "Status"],
+    rows: departments.map((dept) => [dept.name, dept.head, String(dept.headcount + employees.filter((e) => e.department === dept.name && !seedEmployees.some((s) => s.id === e.id)).length), `SAR ${dept.budget.toLocaleString("en-US")}`, dept.status]),
+  };
+  const todayAttendance = employeeAttendance?.date === localDateKey(new Date()) ? employeeAttendance : null;
+  const myProfile: ProfileTarget = employeeMode ? myRecord : "admin";
+  const goToSettings = authUser.role === "admin" ? () => switchPage("Settings") : undefined;
+
+  const renderPageBody = () => {
+    switch (page) {
+      case "Employees": return <EmployeeDirectory employees={employees} onSelect={setProfileView} />;
+      case "Leave management": return employeeMode
+        ? <EmployeeLeavePanel leaves={employeeLeave} onSubmit={submitLeave} />
+        : <LeaveRequestsPanel leaves={leaves} onUpdate={updateLeave} />;
+      case "Attendance": return <TeamAttendancePanel employees={employees} />;
+      case "My salary": return <SalaryPanel employee={myRecord} notify={notify} />;
+      case "Departments": return <ModulePanel key={page} page={page} notify={notify} dataset={departmentDataset} />;
+      case "Work from home": return employeeMode
+        ? <MyWfhPanel requests={wfhRequests.filter((r) => r.employeeId === myRecord.id)} onSubmit={submitWfh} />
+        : <WfhRequestsPanel requests={wfhRequests} onDecide={decideWfh} />;
+      case "Announcements": return <AnnouncementFeed announcements={myAnnouncements} showAudience={!employeeMode} emptyText={employeeMode ? "No announcements for your department yet." : "No announcements yet. Publish one with New announcement."} />;
+      case "Settings": return <SettingsPanel dark={dark} notify={notify} onThemeChange={(mode) => saveTheme(mode === "Dark" || (mode === "System default" && window.matchMedia("(prefers-color-scheme: dark)").matches))} />;
+      default: return <ModulePanel key={page} page={page} notify={notify} employeeMode={employeeMode} />;
+    }
   };
 
-  if (!hydrated) return <div className="auth-loading" aria-label="Loading workspace">Loading workspace…</div>;
-  if (!authUser) return <LoginScreen email={loginEmail} password={loginPassword} error={loginError} onEmailChange={setLoginEmail} onPasswordChange={setLoginPassword} onSubmit={signIn} onDemoFill={(user) => { setLoginEmail(user.email); setLoginPassword(user.password); setLoginError(""); }} />;
+  const renderPage = () => {
+    if (page === "Dashboard") return employeeMode
+      ? <EmployeeDashboard user={authUser} checkedIn={employeeCheckedIn} attendance={todayAttendance} onToggleAttendance={toggleEmployeeAttendance} leaves={employeeLeave} announcements={myAnnouncements} onNavigate={switchPage} />
+      : <AdminDashboard user={authUser} employees={employees} leaves={leaves} pendingCount={pendingCount} onExport={exportEmployees} onAddEmployee={openAddEmployee} onUpdateLeave={updateLeave} onNavigate={switchPage} onSelectEmployee={setProfileView} />;
+    if (page === "Attendance" && employeeMode) return <EmployeeAttendancePanel user={authUser} employee={myRecord} checkedIn={employeeCheckedIn} attendance={todayAttendance} onToggle={toggleEmployeeAttendance} />;
+    const newLabel = page === "Employees" ? "Add employee" : `New ${page === "Leave management" ? "request" : page.replace(/s$/, "").toLowerCase()}`;
+    return <>
+      <PageHeader title={title} description={pageDescription(page)} actions={!employeeMode && page !== "Attendance" && page !== "Work from home" && <>
+        {page === "Employees" && <button className="outline" onClick={exportEmployees}><Download size={15} /> Export CSV</button>}
+        <button className="primary" onClick={(event) => {
+          if (page === "Employees") openAddEmployee(event);
+          else if (page === "Departments") { returnFocusRef.current = event.currentTarget; setAddingDepartment(true); }
+          else if (page === "Announcements") { returnFocusRef.current = event.currentTarget; setComposing(true); }
+          else notify(`${title} action is ready to configure`);
+        }}>{page === "Announcements" ? <Megaphone size={15} /> : <Plus size={15} />} {newLabel}</button>
+      </>} />
+      {renderPageBody()}
+    </>;
+  };
 
+  /* ---------- layout ---------- */
   return <div className={`app ${dark ? "dark" : ""} ${employeeMode ? "employee-mode" : "admin-mode"}`}>
-    <aside className="sidebar">
-      <div className="brand"><div className="brandmark"><BriefcaseBusiness size={18}/></div><div className="brandname">nexus<span style={{ color: "#13a88a" }}>.</span><small>WORKSPACE</small></div></div>
-      <div className="navlabel">WORKSPACE</div><nav className="nav" aria-label="Workspace navigation">{navItems.map(({ label, icon: Icon, count }) => <button key={label} className={page === label ? "active" : ""} aria-current={page === label ? "page" : undefined} onClick={() => switchPage(label)}><Icon size={16} aria-hidden="true"/>{label}{count && !employeeMode && <span className="count" aria-label={`${leaves.filter((leave) => leave.status === "Pending").length} pending requests`}>{leaves.filter((leave) => leave.status === "Pending").length}</span>}</button>)}</nav>
-      <div className="sidebarbottom"><div className="help"><strong>Need a hand?</strong><p>Visit our help center to find answers and learn more.</p><button onClick={() => notify("Help center is coming soon")}>Go to help center ↗</button></div></div>
-    </aside>
+    <Sidebar groups={visibleGroups} page={page} onNavigate={switchPage} badges={badges} user={authUser} onSignOut={signOut} />
     <main className="main">
-      <header className="topbar"><button className="mobilemenu" onClick={() => setMenu(!menu)} onKeyDown={(event) => { if (event.key === "Escape") setMenu(false); }} aria-label={menu ? "Close navigation" : "Open navigation"} aria-expanded={menu}><Menu size={19} aria-hidden="true"/></button><div className="crumb">Workspace <span style={{ color: "#bdc5ce", margin: "0 8px" }}>/</span> <b>{title}</b></div><div className="topbar-spacer" aria-hidden="true"/><div className="panel-anchor"><button className="topaction" aria-label={`Notifications, ${visibleNotices.filter((item) => !item.read).length} unread`} title="Notifications" aria-expanded={activePanel === "notifications"} onKeyDown={(event) => { if (event.key === "Escape") setActivePanel(null); }} onClick={() => setActivePanel(activePanel === "notifications" ? null : "notifications")}><Bell size={17} aria-hidden="true"/>{visibleNotices.some((item) => !item.read) && <i className="dot" aria-hidden="true"/>}</button>{activePanel === "notifications" && <section id="notifications-panel" className="dropdown-panel notifications-panel" aria-label="Notifications" onKeyDown={(event) => { if (event.key === "Escape") setActivePanel(null); }}><div className="dropdown-head"><div><h2>Notifications</h2><small aria-live="polite">{visibleNotices.filter((item) => !item.read).length} unread</small></div><div className="notification-controls"><button className="linkbtn" onClick={() => setNotices(notices.map((item) => visibleNotices.some((visible) => visible.id === item.id) ? { ...item, read: true } : item))}>Mark all read</button><button className="notification-close" aria-label="Close notifications" title="Close notifications" onClick={() => setActivePanel(null)}><X size={17} aria-hidden="true"/></button></div></div><div className="notice-list">{visibleNotices.map((item) => <button key={item.id} className={`notice-item ${item.read ? "read" : "unread"}`} onClick={() => { setNotices(notices.map((notice) => notice.id === item.id ? { ...notice, read: true } : notice)); setActivePanel(null); switchPage(item.page); }}><span className="notice-mark" aria-hidden="true"/><span className="notice-copy"><strong>{item.title}</strong><small>{item.body}</small><em>{item.time}</em></span></button>)}</div></section>}</div><button className="topaction" aria-label={dark ? "Use light theme" : "Use dark theme"} aria-pressed={dark} title="Toggle theme" onClick={toggleTheme}>{dark ? <Sun size={17} aria-hidden="true"/> : <Moon size={17} aria-hidden="true"/>}</button><div className="panel-anchor profile-anchor"><button className="topavatar" aria-label={`Open ${authUser.name} profile`} aria-expanded={activePanel === "profile"} onKeyDown={(event) => { if (event.key === "Escape") setActivePanel(null); }} onClick={() => setActivePanel(activePanel === "profile" ? null : "profile")}><div className="avatar" aria-hidden="true">{authUser.initials}</div><span>{authUser.name}</span><ChevronDown size={13} color="#9aa5b2" aria-hidden="true"/></button>{activePanel === "profile" && <section id="profile-menu" className="dropdown-panel profile-panel" aria-label="User profile menu" onKeyDown={(event) => { if (event.key === "Escape") setActivePanel(null); }}><div className="profile-summary"><div className="avatar" aria-hidden="true">{authUser.initials}</div><div><strong>{authUser.name}</strong><small>{authUser.email}</small><small>{authUser.jobTitle}</small></div></div><button onClick={(event) => { returnFocusRef.current = event.currentTarget; setProfileView(currentProfile); setActivePanel(null); }}><Users size={15} aria-hidden="true"/> View full profile</button>{authUser.role === "admin" && <button onClick={() => { setActivePanel(null); switchPage("Settings"); }}><Settings size={15} aria-hidden="true"/> Account settings</button>}<button onClick={signOut}><X size={15} aria-hidden="true"/> Sign out</button></section>}</div></header>
-      {menu && <><button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMenu(false)}/><nav className="mobile-drawer" id="mobile-navigation" aria-label="Mobile workspace navigation" onKeyDown={(event) => { if (event.key === "Escape") setMenu(false); }}>{navItems.map(({ label, icon: Icon, count }) => <button key={label} className={page === label ? "active" : ""} aria-current={page === label ? "page" : undefined} onClick={() => switchPage(label)}><Icon size={17} aria-hidden="true"/>{label}{count && !employeeMode && <span className="count" aria-label={`${leaves.filter((leave) => leave.status === "Pending").length} pending requests`}>{leaves.filter((leave) => leave.status === "Pending").length}</span>}</button>)}</nav></>}
-      <nav className="mobile-nav" aria-label="Mobile shortcuts">{(employeeMode ? ["Dashboard", "Attendance", "Leave management", "Tasks"] : ["Dashboard", "Employees", "Attendance", "Leave management"]).map((label) => { const item = navItems.find((entry) => entry.label === label)!; const Icon = item.icon; return <button key={label} className={page === label ? "active" : ""} aria-current={page === label ? "page" : undefined} onClick={() => switchPage(label)}><Icon size={18}/><span>{label === "Leave management" ? "Leave" : label}</span></button>; })}<button className={menu ? "active" : ""} aria-expanded={menu} onClick={() => setMenu(!menu)}><MoreHorizontal size={18}/><span>More</span></button></nav>
-      <div className="content">{page === "Dashboard" && employeeMode ? <EmployeeDashboard user={authUser} checkedIn={employeeCheckedIn} attendance={todayEmployeeAttendance} onToggleAttendance={toggleEmployeeAttendance} leaves={employeeLeave} onNavigate={switchPage}/> : page === "Dashboard" ? <>
-        <div className="welcome"><div><p className="eyebrow">Wednesday, October 23, 2024</p><h1 tabIndex={-1}>Good morning, Alex <span>👋</span></h1><p>Here&apos;s what&apos;s happening across your organization today.</p></div><button className="primary" onClick={openEmployeeModal}><Plus size={15}/> Add employee</button></div>
-        <section className="stats">{[{ label: "Total employees", value: String(employees.length + 236), change: "+12.5%", hint: "vs. last month", icon: Users, color: "#e8f5f1", ink: "#14836d" }, { label: "Departments", value: "12", change: "+2", hint: "new this quarter", icon: Building2, color: "#eef1fc", ink: "#6373c3" }, { label: "On leave today", value: String(leaves.filter((leave) => leave.status === "Approved").length + 8), change: "2 upcoming", hint: "this week", icon: CalendarDays, color: "#fff5e5", ink: "#c4861e" }, { label: "Open positions", value: "08", change: "4 new", hint: "this month", icon: BriefcaseBusiness, color: "#f5edf8", ink: "#9063a8" }].map(({ label, value, change, hint, icon: Icon, color, ink }) => <article className="card stat" key={label}><div className="stathead">{label}<span className="staticon" style={{ background: color, color: ink }}><Icon size={16}/></span></div><div className="statvalue">{value}</div><div className="trend"><ArrowUpRight size={12} style={{ verticalAlign: "-2px" }}/> {change} <span>{hint}</span></div></article>)}</section>
-        <div className="grid-main"><section className="card panel"><div className="paneltitle"><div><h2>Workforce overview</h2><p>Employee growth throughout the year</p></div><div style={{ display: "flex", gap: 10, alignItems: "center" }}><div className="legend"><span><i className="teal"/> This year</span><span><i/> Last year</span></div><select className="filterselect" aria-label="Chart period"><option>This year</option><option>Last year</option></select></div></div><div className="chart" role="img" aria-label="Workforce overview bar chart comparing this year's employee growth with last year, January through December"><div className="sr-only">Monthly workforce values are shown as paired bars for this year and last year.</div>{[0,1,2,3,4,5,6,7,8,9,10,11].map((i) => <div className="barcol" key={i} aria-hidden="true"><div className="bar" style={{ height: `${[34,49,42,61,53,68,57,76,62,83,73,94][i]}%` }}/><div className="bar darkbar" style={{ height: `${[25,38,31,48,43,56,49,64,55,73,65,82][i]}%` }}/></div>)}</div><div className="months" aria-hidden="true">{["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((month) => <span key={month}>{month}</span>)}</div></section>
-          <section className="card panel"><div className="paneltitle"><div><h2>Leave requests</h2><p>Review and manage requests</p></div><button className="linkbtn" onClick={() => switchPage("Leave management")}>View all</button></div>{leaves.slice(0, 3).map((leave, i) => <div className="leaveitem dashboard-leave-item" key={`${leave.name}-${i}`}><div className="miniavatar" style={{ background: leave.color }}>{leave.initials}</div><div className="leave-identity"><strong>{leave.name}</strong><small>{leave.kind}<span aria-hidden="true"> · </span>{leave.dates}</small></div><div className="leave-controls"><span className={`badge ${leave.status.toLowerCase()}`}>{leave.status}</span>{leave.status === "Pending" && <><button className="linkbtn" aria-label={`Approve ${leave.name} leave request`} title="Approve" onClick={() => updateLeave(i, "Approved")}><Check size={14}/></button><button className="linkbtn reject-leave" aria-label={`Reject ${leave.name} leave request`} title="Reject" onClick={() => updateLeave(i, "Rejected")}><X size={14}/></button></>}</div></div>)}</section></div>
-        <div className="bottomgrid"><section className="card panel"><div className="paneltitle"><div><h2>Recently added employees</h2><p>Your newest team members</p></div><button className="linkbtn" onClick={() => switchPage("Employees")}>View all</button></div><EmployeeTable employees={employees.slice(0, 4)} onSelect={setProfileView} emailColumn /></section><section className="card panel"><div className="paneltitle"><div><h2>Team tasks</h2><p>Track your team&apos;s progress</p></div><button className="linkbtn" onClick={() => switchPage("Tasks")}>View all</button></div>{taskData.slice(0, 3).map((task) => <div className="taskitem" key={task.name}><div className="tasktop"><strong>{task.name}</strong><span className={`badge ${task.color}`}>{task.status}</span></div><small>{task.group}</small><div className="taskfoot"><div className="progressline"><i style={{ width: `${task.done}%` }}/></div><small>{task.done}%</small></div></div>)}</section></div>
-      </> : <>
-        <div className="sectionhead"><div><h1 tabIndex={-1}>{title}</h1><p>{pageDescription(page)}</p></div>{!employeeMode && <div style={{ display: "flex", gap: 8 }}>{page === "Employees" && <button className="outline" onClick={downloadCsv}><Download size={14}/> Export CSV</button>}<button className="primary" onClick={(event) => page === "Employees" ? openEmployeeModal(event) : notify(`${title} action is ready to configure`)}><Plus size={15}/> {page === "Employees" ? "Add employee" : `New ${page === "Leave management" ? "request" : page.replace(/s$/, "").toLowerCase()}`}</button></div>}</div>
-        {renderPageContent()}
-      </>}
+      <Topbar title={title} menuOpen={menu} onToggleMenu={() => setMenu(!menu)} onCloseMenu={() => setMenu(false)} navItems={navItems} onNavigate={switchPage}
+        notices={visibleNotices}
+        onMarkAllRead={() => setNotices(notices.map((item) => visibleNotices.some((visible) => visible.id === item.id) ? { ...item, read: true } : item))}
+        onOpenNotice={(notice) => { setNotices(notices.map((item) => item.id === notice.id ? { ...item, read: true } : item)); switchPage(notice.page); }}
+        dark={dark} onToggleTheme={() => saveTheme(!dark)}
+        user={authUser} onViewProfile={(trigger) => { returnFocusRef.current = trigger; setProfileView(myProfile); }} onOpenSettings={goToSettings} onSignOut={signOut} />
+      {menu && <MobileDrawer groups={visibleGroups} page={page} onNavigate={switchPage} badges={badges} onClose={() => setMenu(false)} />}
+      <MobileTabBar labels={employeeMode ? ["Dashboard", "Attendance", "Leave management", "My salary"] : ["Dashboard", "Employees", "Attendance", "Leave management"]} items={navItems} page={page} onNavigate={switchPage} menuOpen={menu} onToggleMenu={() => setMenu(!menu)} />
+      <div className="content">
+        {page !== "Dashboard" && <SectionTabs groups={visibleGroups} page={page} onNavigate={switchPage} />}
+        {renderPage()}
         <footer className="design-credit">Designed by <strong>Clever Works</strong></footer>
       </div>
     </main>
-    {toast && <div className="toast" role="status" aria-live="polite">{toast}</div>}
-    {modal && <div className="modalback" onClick={(e) => { if (e.target === e.currentTarget) setModal(false); }}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title" onKeyDown={(event) => handleDialogKeyDown(event, () => setModal(false))}><h2 id="employee-modal-title">Add a team member</h2><p>Create an employee profile for your organization.</p><div className="formrow"><label htmlFor="employee-name">Full name</label><input id="employee-name" autoFocus placeholder="e.g. Taylor Morgan" value={nameInput} onChange={(e) => setNameInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") createEmployee(); }}/></div><div className="formrow"><label htmlFor="employee-dept">Department</label><select id="employee-dept" value={deptInput} onChange={(e) => setDeptInput(e.target.value)}>{["Design", "Engineering", "Marketing", "Human Resources", "Finance", "Operations"].map((dept) => <option key={dept}>{dept}</option>)}</select></div><div className="modalactions"><button className="outline" onClick={() => setModal(false)}>Cancel</button><button className="primary" onClick={createEmployee}><Plus size={14}/> Add employee</button></div></div></div>}
-    {profileView && <div className="modalback" onClick={(e) => { if (e.target === e.currentTarget) setProfileView(null); }}><section className="modal user-profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title" onKeyDown={(event) => handleDialogKeyDown(event, () => setProfileView(null))}><button className="profile-close" autoFocus aria-label="Close profile" onClick={() => setProfileView(null)}><X size={18}/></button>{profileView === "alex" ? <><div className="profile-hero"><div className="avatar profile-large" aria-hidden="true">AR</div><div><h2 id="profile-title">Alex Rivera</h2><p>Super Admin · Operations</p></div></div><div className="profile-details"><div><small>Email</small><strong>alex.rivera@acme.co</strong></div><div><small>Employee ID</small><strong>EMP-1001</strong></div><div><small>Work location</small><strong>Riyadh, Saudi Arabia</strong></div><div><small>Department</small><strong>Operations</strong></div></div></> : <><div className="profile-hero"><div className="avatar profile-large" aria-hidden="true">{profileView.initials}</div><div><h2 id="profile-title">{profileView.name}</h2><p>{profileView.role} · {profileView.department}</p></div></div><div className="profile-details"><div><small>Email</small><strong>{profileView.email}</strong></div><div><small>Employee ID</small><strong>{profileView.id}</strong></div><div><small>Status</small><strong>{profileView.status}</strong></div><div><small>Department</small><strong>{profileView.department}</strong></div></div></>}<div className="modalactions">{profileView === "alex" && <button className="outline" onClick={() => { setProfileView(null); switchPage("Settings"); }}>Account settings</button>}<button className="primary" onClick={() => setProfileView(null)}>Done</button></div></section></div>}
+    <Toast message={toast} />
+    {addingEmployee && <AddEmployeeModal departments={departmentNames} onCreate={createEmployee} onClose={() => setAddingEmployee(false)} />}
+    {addingDepartment && <AddDepartmentModal existing={departments} people={[authUser.name, ...employees.map((e) => e.name)]} onCreate={createDepartment} onClose={() => setAddingDepartment(false)} />}
+    {composing && <AnnouncementComposer departments={departmentNames} onPublish={publishAnnouncement} onClose={() => setComposing(false)} />}
+    {profileView && <ProfileModal profile={profileView} onClose={() => setProfileView(null)} onOpenSettings={goToSettings && (() => { setProfileView(null); goToSettings(); })} />}
   </div>;
 }
-
-function LoginScreen({ email, password, error, onEmailChange, onPasswordChange, onSubmit, onDemoFill }: { email: string; password: string; error: string; onEmailChange: (value: string) => void; onPasswordChange: (value: string) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onDemoFill: (user: DemoUser) => void }) { return <main className="auth-page"><section className="auth-card" aria-labelledby="sign-in-title"><div className="auth-brand"><div className="brandmark"><BriefcaseBusiness size={18}/></div><div className="brandname">nexus<span style={{ color: "#13a88a" }}>.</span><small>WORKSPACE</small></div></div><p className="auth-eyebrow">NEXUS WORKSPACE</p><h1 id="sign-in-title">Sign in to your account</h1><p className="auth-intro">Choose a demo role to explore the ERP portal.</p><form onSubmit={onSubmit}><label className="auth-label" htmlFor="login-email">Work email</label><input id="login-email" type="email" autoComplete="username" required value={email} onChange={(event) => onEmailChange(event.target.value)}/><label className="auth-label" htmlFor="login-password">Password</label><input id="login-password" type="password" autoComplete="current-password" required value={password} onChange={(event) => onPasswordChange(event.target.value)}/>{error && <p className="auth-error" role="alert">{error}</p>}<button className="primary auth-submit" type="submit">Sign in</button></form><div className="demo-access"><h2>Demo accounts</h2><p>These sample credentials are for this local preview.</p>{demoUsers.map((user) => <div className="demo-account" key={user.email}><div><strong>{user.role === "admin" ? "Administrator" : "Employee"}</strong><small>{user.email}</small><small>Password: {user.password}</small></div><button className="outline" onClick={() => onDemoFill(user)}>Use account</button></div>)}</div><p className="auth-note">Demo authentication only. Sign-in is stored in this browser; it is not connected to a server.</p></section></main>; }
-
-function EmployeeDashboard({ user, checkedIn, attendance, onToggleAttendance, leaves, onNavigate }: { user: DemoUser; checkedIn: boolean; attendance: EmployeeAttendance | null; onToggleAttendance: () => void; leaves: { kind: string; dates: string; status: string }[]; onNavigate: (page: string) => void }) { const complete = !!attendance?.checkOutAt; return <><div className="welcome"><div><p className="eyebrow">Wednesday, October 23, 2024</p><h1 tabIndex={-1}>Welcome back, {user.name.split(" ")[0]}</h1><p>Here&apos;s your workday at a glance.</p></div></div><section className="stats employee-stats"><article className="card stat"><div className="stathead">Annual leave balance</div><div className="statvalue">12 days</div><div className="trend"><span>Available this year</span></div></article><article className="card stat"><div className="stathead">Leave requests</div><div className="statvalue">{leaves.filter((item) => item.status === "Pending").length} pending</div><div className="trend"><span>{leaves.length} requests in your history</span></div></article><article className="card stat"><div className="stathead">Tasks in progress</div><div className="statvalue">2</div><div className="trend"><span>1 due this week</span></div></article></section><div className="grid-main employee-grid"><section className="card panel employee-dashboard-attendance"><div className="paneltitle"><div><h2>My attendance</h2><p>Today&apos;s check-in and work hours</p></div><span className={`badge ${checkedIn ? "active" : complete ? "completed" : "pending"}`}>{checkedIn ? "Checked in" : complete ? "Workday complete" : "Not checked in"}</span></div><AttendanceSummary attendance={attendance} checkedIn={checkedIn}/>{!complete && <button className="primary" onClick={onToggleAttendance}>{checkedIn ? "Check out" : "Check in"}</button>}</section><section className="card panel"><div className="paneltitle"><div><h2>My upcoming tasks</h2><p>Assigned to you</p></div><button className="linkbtn" onClick={() => onNavigate("Tasks")}>View tasks</button></div>{[{ name: "Design system review", due: "Due Oct 29", status: "In progress" }, { name: "Mobile prototype feedback", due: "Due Oct 30", status: "In progress" }].map((task) => <div className="taskitem" key={task.name}><div className="tasktop"><strong>{task.name}</strong><span className="badge progress">{task.status}</span></div><small>{task.due}</small></div>)}</section></div><section className="card panel employee-announcements"><div className="paneltitle"><div><h2>Company announcements</h2><p>Updates for your workspace</p></div><button className="linkbtn" onClick={() => onNavigate("Announcements")}>View announcements</button></div><div className="employee-news"><strong>Q4 all-hands meeting</strong><span>Company meeting · Thursday at 10:00 AM</span></div><div className="employee-news"><strong>Open enrollment starts soon</strong><span>Benefits enrollment opens next week.</span></div></section></>; }
-
-function EmployeeAttendancePanel({ user, checkedIn, attendance, onToggle }: { user: DemoUser; checkedIn: boolean; attendance: EmployeeAttendance | null; onToggle: () => void }) { const complete = !!attendance?.checkOutAt; return <><div className="sectionhead"><div><h1 tabIndex={-1}>My Attendance</h1><p>Review your check-in, check-out, and total hours for today.</p></div></div><section className="card panel employee-attendance-panel"><div className="employee-profile-row"><div className="avatar profile-large">{user.initials}</div><div><h2>{user.name}</h2><p>{user.jobTitle} · {user.department}</p></div><span className={`badge ${checkedIn ? "active" : complete ? "completed" : "pending"}`}>{checkedIn ? "Present" : complete ? "Workday complete" : "Not checked in"}</span></div><AttendanceSummary attendance={attendance} checkedIn={checkedIn}/>{!complete && <button className="primary" onClick={onToggle}>{checkedIn ? "Check out" : "Check in"}</button>}{complete && <p className="attendance-complete-note">Your completed work hours are saved for today.</p>}</section></>; }
-
-function AttendanceSummary({ attendance, checkedIn }: { attendance: EmployeeAttendance | null; checkedIn: boolean }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!checkedIn) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [checkedIn]);
-  const startedAt = attendance ? new Date(attendance.checkInAt).getTime() : 0;
-  const endedAt = attendance?.checkOutAt ? new Date(attendance.checkOutAt).getTime() : checkedIn ? now : startedAt;
-  const workedSeconds = attendance ? Math.max(0, Math.floor((endedAt - startedAt) / 1000)) : 0;
-  const hours = Math.floor(workedSeconds / 3600);
-  const minutes = Math.floor((workedSeconds % 3600) / 60);
-  const seconds = workedSeconds % 60;
-  return <div className="attendance-summary">
-    <div><span>Check-in</span><strong>{attendance ? formatAttendanceTime(attendance.checkInAt) : "—"}</strong></div>
-    <div><span>Check-out</span><strong>{attendance?.checkOutAt ? formatAttendanceTime(attendance.checkOutAt) : "—"}</strong></div>
-    <div><span>Total hours</span><strong>{attendance ? `${hours}h ${String(minutes).padStart(2, "0")}m${checkedIn ? ` ${String(seconds).padStart(2, "0")}s` : ""}` : "—"}</strong></div>
-  </div>;
-}
-
-function localDateKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }
-function formatAttendanceTime(value: string) { return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
-
-function EmployeeLeavePanel({ leaves, onSubmit }: { leaves: { kind: string; dates: string; status: string }[]; onSubmit: (request: { kind: string; dates: string; status: string }) => void }) { const [kind, setKind] = useState("Annual leave"); const [start, setStart] = useState(""); const [end, setEnd] = useState(""); const [dateError, setDateError] = useState(""); const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!start || !end) return; if (end < start) { setDateError("End date must be on or after the start date."); return; } setDateError(""); const formatDate = (value: string) => new Date(`${value}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" }); onSubmit({ kind, dates: `${formatDate(start)} – ${formatDate(end)}`, status: "Pending" }); setStart(""); setEnd(""); }; return <><section className="card panel"><div className="paneltitle"><div><h2>Request time off</h2><p>Your request will be sent to your manager for review.</p></div></div><form className="leave-request-form" onSubmit={submit}><label>Leave type<select value={kind} onChange={(event) => setKind(event.target.value)}><option>Annual leave</option><option>Sick leave</option><option>Personal day</option></select></label><label>Start date<input type="date" required value={start} onChange={(event) => { setStart(event.target.value); setDateError(""); }}/></label><label>End date<input type="date" required min={start || undefined} value={end} aria-invalid={!!dateError} aria-describedby={dateError ? "leave-date-error" : undefined} onChange={(event) => { setEnd(event.target.value); setDateError(""); }}/></label>{dateError && <p id="leave-date-error" className="auth-error" role="alert">{dateError}</p>}<button className="primary" type="submit">Submit request</button></form></section><section className="card panel employee-leave-history"><div className="paneltitle"><div><h2>My leave requests</h2><p>Your personal request history</p></div></div>{leaves.map((leave, index) => <div className="leaveitem" key={`${leave.kind}-${leave.dates}-${index}`}><div style={{ flex: 1 }}><strong>{leave.kind}</strong><small>{leave.dates}</small></div><span className={`badge ${leave.status.toLowerCase()}`}>{leave.status}</span></div>)}</section></>; }
-
-function EmployeeTable({ employees, onSelect, emailColumn = false }: { employees: Employee[]; onSelect: (employee: Employee) => void; emailColumn?: boolean }) { return <div className="tablewrap" role="region" aria-label="Employee records" tabIndex={0}><table className="table" aria-label="Employee directory"><thead><tr><th scope="col">Employee</th>{emailColumn && <th scope="col">Email address</th>}<th scope="col">Department</th><th scope="col">Job title</th><th scope="col">Status</th><th scope="col">Actions</th></tr></thead><tbody>{employees.map((person) => <tr key={person.id}><td><div className="person"><div className="miniavatar" aria-hidden="true" style={{ background: person.color }}>{person.initials}</div><div><button className="person-link" onClick={() => onSelect(person)}>{person.name}</button>{!emailColumn && <small style={{ display: "block", color: "var(--muted)", fontSize: 9, marginTop: 3 }}>{person.email}</small>}</div></div></td>{emailColumn && <td>{person.email}</td>}<td>{person.department}</td><td>{person.role}</td><td><span className={`badge ${person.status === "Active" ? "active" : "pending"}`}>{person.status}</span></td><td><TableActionMenu label={person.name}><button aria-label={`View ${person.name} profile`} onClick={() => onSelect(person)}>View profile</button><button aria-label={`Copy ${person.name} email`} onClick={() => copyValue(person.email)}>Copy email</button></TableActionMenu></td></tr>)}</tbody></table></div>; }
-
-function TableActionMenu({ label, children }: { label: string; children: React.ReactNode }) { const [position, setPosition] = useState<{ top: number; left: number } | null>(null); return <details className="row-action-menu" onToggle={(event) => { if (event.currentTarget.open) { const rect = event.currentTarget.querySelector("summary")!.getBoundingClientRect(); const top = rect.bottom + 4 > window.innerHeight - 100 ? rect.top - 92 : rect.bottom + 4; setPosition({ top: Math.max(8, top), left: Math.max(8, Math.min(rect.right - 184, window.innerWidth - 192)) }); } else setPosition(null); }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}><summary aria-label={`Actions for ${label}`} title={`Actions for ${label}`}><MoreHorizontal size={17} aria-hidden="true"/></summary><div className="row-action-popover" style={position ? { top: position.top, left: position.left } : undefined} role="group" aria-label={`${label} actions`} onClick={(event) => { if ((event.target as HTMLElement).closest("button")) event.currentTarget.parentElement?.removeAttribute("open"); }}>{children}</div></details>; }
-
-async function copyValue(value: string) { try { await navigator.clipboard.writeText(value); } catch { const input = document.createElement("textarea"); input.value = value; input.style.position = "fixed"; input.style.opacity = "0"; document.body.appendChild(input); input.select(); document.execCommand("copy"); input.remove(); } }
-
-function exportTableRow(filename: string, columns: string[], values: string[]) { const quote = (value: string) => `"${value.replaceAll('"', '""')}"`; const csv = `${columns.map(quote).join(",")}\r\n${values.map(quote).join(",")}`; const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; anchor.click(); URL.revokeObjectURL(url); }
-
-function handleDialogKeyDown(event: KeyboardEvent<HTMLElement>, close: () => void) { if (event.key === "Escape") { event.preventDefault(); close(); return; } if (event.key !== "Tab") return; const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')); if (!controls.length) { event.preventDefault(); return; } const first = controls[0]; const last = controls[controls.length - 1]; if (event.shiftKey && (document.activeElement === first || !event.currentTarget.contains(document.activeElement))) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && (document.activeElement === last || !event.currentTarget.contains(document.activeElement))) { event.preventDefault(); first.focus(); } }
-
-function AttendancePanel({ checkedIn, setCheckedIn, notify }: { checkedIn: boolean; setCheckedIn: (value: boolean) => void; notify: (value: string) => void }) { const rows = [["Alex Rivera", "09:02 AM", "—", "Present"], ["Olivia Rhye", "08:48 AM", "—", "Present"], ["Phoenix Baker", "09:34 AM", "—", "Late"], ["Lana Steiner", "Remote", "—", "Remote work"], ["Demi Wilkinson", "—", "—", "On leave"]]; return <><div className="stats">{[["Present today", "218"], ["Late arrivals", "06"], ["On leave", "09"], ["Remote work", "24"]].map(([label, value]) => <div className="card stat" key={label}><div className="stathead">{label}<span className="staticon" aria-hidden="true" style={{ background: "#e8f5f1", color: "#14836d" }}><Clock3 size={15}/></span></div><div className="statvalue">{value}</div><div className="trend"><span>Today · October 23</span></div></div>)}</div><section className="card panel"><div className="paneltitle"><div><h2>Today&apos;s attendance</h2><p>Wednesday, October 23, 2024</p></div><button className="primary" onClick={() => { setCheckedIn(!checkedIn); notify(checkedIn ? "You checked out successfully" : "You checked in at 9:14 AM"); }}>{checkedIn ? "Check out" : "Check in"}</button></div><div className="tablewrap" role="region" aria-label="Attendance records" tabIndex={0}><table className="table" aria-label="Today employee attendance"><thead><tr><th scope="col">Employee</th><th scope="col">Check in</th><th scope="col">Check out</th><th scope="col">Status</th></tr></thead><tbody>{rows.map((row) => <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{i === 3 ? <span className={`badge ${cell === "Present" ? "active" : cell === "Late" ? "pending" : "remote"}`}>{cell}</span> : cell}</td>)}</tr>)}</tbody></table></div></section></>; }
-
-type SettingKey = "Organization name" | "Work week" | "Leave approval" | "Theme";
-function SettingsPanel({ dark, onThemeChange, notify }: { dark: boolean; onThemeChange: (mode: string) => void; notify: (message: string) => void }) {
-  const [values, setValues] = useState<Record<SettingKey, string>>({ "Organization name": "Acme Corporation", "Work week": "Sunday – Thursday", "Leave approval": "Manager → HR", Theme: dark ? "Dark" : "Light" });
-  const [editing, setEditing] = useState<SettingKey | null>(null);
-  const [draft, setDraft] = useState("");
-  const definitions: { key: SettingKey; description: string; options?: string[] }[] = [
-    { key: "Organization name", description: "Your company display name" },
-    { key: "Work week", description: "Standard work days", options: ["Sunday – Thursday", "Monday – Friday", "Monday – Saturday"] },
-    { key: "Leave approval", description: "Approval workflow", options: ["Manager → HR", "Manager only", "HR only"] },
-    { key: "Theme", description: "Workspace appearance", options: ["System default", "Light", "Dark"] },
-  ];
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("nexus-settings");
-      if (saved) setValues((current) => ({ ...current, ...JSON.parse(saved) }));
-    } catch { /* use the workspace defaults */ }
-  }, []);
-  const beginEdit = (key: SettingKey) => { setEditing(key); setDraft(values[key]); };
-  const save = () => {
-    if (!editing || (editing === "Organization name" && !draft.trim())) return;
-    const updated = { ...values, [editing]: draft.trim() };
-    setValues(updated);
-    try { localStorage.setItem("nexus-settings", JSON.stringify(updated)); } catch { /* changes remain available for this session */ }
-    if (editing === "Theme") onThemeChange(draft);
-    notify(`${editing} updated`);
-    setEditing(null);
-  };
-  return <section className="card panel settings-panel">
-    <div className="paneltitle"><div><h2>Workspace settings</h2><p>Update organization preferences and defaults</p></div></div>
-    <div className="settings-list">{definitions.map(({ key, description, options }) => <div className="setting-row" key={key}>
-      <div className="setting-label"><h3>{key}</h3><p>{description}</p></div>
-      <div className="setting-value">{editing === key ? options ? <select className="filterselect" aria-label={`Edit ${key}`} value={draft} onChange={(event) => setDraft(event.target.value)}>{options.map((option) => <option key={option}>{option}</option>)}</select> : <input className="filterinput" aria-label="Edit organization name" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") save(); }}/> : <span>{values[key]}</span>}</div>
-      <div className="setting-actions">{editing === key ? <><button className="primary" onClick={save}>Save</button><button className="outline" onClick={() => setEditing(null)}>Cancel</button></> : <button className="outline" aria-label={`Edit ${key}`} onClick={() => beginEdit(key)}>Edit</button>}</div>
-    </div>)}</div>
-  </section>;
-}
-
-function pageDescription(page: string) { const descriptions: Record<string, string> = { Employees: "Manage your people, profiles, and employee records.", Departments: "Organize teams, department leads, and budgets.", Attendance: "A clear view of today's time and attendance.", "Leave management": "Review requests and keep time off moving smoothly.", Tasks: "Plan work, assign owners, and track what is moving.", Projects: "Keep project teams and milestones in sync.", Documents: "Find and organize your team's shared files.", Inventory: "Track stock levels and inventory movement.", Finance: "Manage expenses, budgets, and approvals.", Announcements: "Share updates with the people who need them.", Reports: "Understand the health of your organization.", Settings: "Set up your workspace and organization preferences." }; return descriptions[page] ?? "Your workspace, all in one place."; }
-
-function ModulePanel({ page, notify, employeeMode = false }: { page: string; notify: (value: string) => void; employeeMode?: boolean }) { const [term, setTerm] = useState(""); const [selectedRow, setSelectedRow] = useState<string[] | null>(null); const datasets: Record<string, { columns: string[]; rows: string[][] }> = { Departments: { columns: ["Department", "Department head", "Employees", "Annual budget", "Status"], rows: [["Engineering", "Phoenix Baker", "48", "$1,240,000", "Active"], ["Design", "Olivia Rhye", "16", "$420,000", "Active"], ["Marketing", "Lana Steiner", "23", "$680,000", "Active"], ["Human Resources", "Demi Wilkinson", "12", "$320,000", "Active"]] }, Tasks: { columns: ["Task", "Team", "Due date", "Priority", "Status"], rows: [["Q4 brand guidelines", "Design team", "Oct 28, 2024", "High", "In progress"], ["Mobile app redesign", "Product team", "Nov 04, 2024", "Medium", "In progress"], ["October payroll review", "Finance team", "Oct 24, 2024", "High", "Completed"], ["Website accessibility audit", "Engineering", "Nov 08, 2024", "Low", "In progress"]] }, Projects: { columns: ["Project", "Owner", "Members", "Deadline", "Progress"], rows: [["Website redesign", "Olivia Rhye", "8 members", "Nov 15, 2024", "72%"], ["Mobile app v2", "Phoenix Baker", "12 members", "Dec 04, 2024", "48%"], ["Q4 growth campaign", "Lana Steiner", "6 members", "Nov 01, 2024", "85%"]] }, Documents: { columns: ["Document", "Category", "Last updated", "Owner", "Access"], rows: [["Employee handbook.pdf", "Company", "Oct 18, 2024", "Alex Rivera", "Everyone"], ["Brand guidelines v3.fig", "Design", "Oct 17, 2024", "Olivia Rhye", "Department"], ["Q4 budget forecast.xlsx", "Finance", "Oct 16, 2024", "Alex Rivera", "Restricted"]] }, Inventory: { columns: ["Item", "Category", "Warehouse", "In stock", "Status"], rows: [["MacBook Pro 14-inch", "Electronics", "Main office", "12", "In stock"], ["Wireless keyboard", "Accessories", "Main office", "04", "Low stock"], ["USB-C docking station", "Accessories", "Warehouse A", "28", "In stock"]] }, Finance: { columns: ["Expense", "Category", "Requested by", "Date", "Amount"], rows: [["Design software licenses", "Software", "Olivia Rhye", "Oct 22, 2024", "$2,480"], ["Team offsite travel", "Travel", "Phoenix Baker", "Oct 21, 2024", "$1,250"], ["Office supplies", "Operations", "Lana Steiner", "Oct 20, 2024", "$384"]] }, Announcements: { columns: ["Announcement", "Audience", "Published", "Priority", "Status"], rows: [["Q4 all-hands meeting", "Everyone", "Oct 22, 2024", "Important", "Published"], ["Open enrollment starts soon", "Everyone", "Oct 18, 2024", "Normal", "Published"], ["Design team showcase", "Design", "Oct 16, 2024", "Normal", "Published"]] }, Reports: { columns: ["Report", "Category", "Last generated", "Owner", "Action"], rows: [["Headcount overview", "People", "Oct 23, 2024", "Alex Rivera", "View report"], ["Attendance summary", "People", "Oct 22, 2024", "Alex Rivera", "View report"], ["Department expenses", "Finance", "Oct 20, 2024", "Alex Rivera", "View report"]] }, Settings: { columns: ["Setting", "Description", "Current value", "Action"], rows: [["Organization name", "Your company display name", "Acme Corporation", "Edit"], ["Work week", "Standard work days", "Sunday – Thursday", "Edit"], ["Leave approval", "Approval workflow", "Manager → HR", "Edit"], ["Theme", "Workspace appearance", "System default", "Edit"]] } }; const employeeDatasets: Record<string, { columns: string[]; rows: string[][] }> = { Tasks: { columns: ["Task", "Team", "Due date", "Priority", "Status"], rows: [["Design system review", "Design team", "Oct 29, 2024", "High", "In progress"], ["Mobile prototype feedback", "Product team", "Oct 30, 2024", "Medium", "In progress"]] }, Documents: { columns: ["Document", "Category", "Last updated", "Owner", "Access"], rows: [["Employee handbook.pdf", "Company", "Oct 18, 2024", "People team", "Everyone"], ["Brand guidelines v3.fig", "Design", "Oct 17, 2024", "Olivia Rhye", "Department"]] }, Announcements: datasets.Announcements }; const data = (employeeMode ? employeeDatasets[page] : undefined) ?? datasets[page] ?? datasets.Tasks; const filtered = data.rows.filter((row) => row.join(" ").toLowerCase().includes(term.toLowerCase())); return <><div className="filters"><label className="searchbox" style={{ margin: 0, width: 250 }}><Search size={14}/><input aria-label={`Search ${page.toLowerCase()}`} placeholder={`Search ${page.toLowerCase()}...`} value={term} onChange={(e) => setTerm(e.target.value)}/></label><button className="outline" onClick={() => notify("Filters are up to date")}><ArrowDownRight size={14} aria-hidden="true"/> Filters</button></div><section className="card panel"><div className="paneltitle"><div><h2>{page} overview</h2><p aria-live="polite">{filtered.length} records in your workspace</p></div><button className="outline" onClick={() => notify(`${page} report downloaded`)}><Download size={14} aria-hidden="true"/> Export</button></div><div className="tablewrap" role="region" aria-label={`${page} records`} tabIndex={0}><table className="table" aria-label={`${page} data`}><thead><tr>{data.columns.map((column) => <th scope="col" key={column}>{column}</th>)}<th scope="col">Actions</th></tr></thead><tbody>{filtered.map((row) => <tr key={row[0]}>{row.map((cell, i) => <td key={i}>{i === row.length - 1 && ["Active", "In progress", "Completed", "Published", "In stock", "Low stock"].includes(cell) ? <span className={`badge ${["Active", "Completed", "Published", "In stock"].includes(cell) ? "active" : cell === "Low stock" ? "pending" : "progress"}`}>{cell}</span> : cell}</td>)}<td><TableActionMenu label={row[0]}><button aria-label={`View details for ${row[0]}`} onClick={() => setSelectedRow(row)}>View details</button><button aria-label={`Export ${row[0]} row as CSV`} onClick={() => exportTableRow(`${page.toLowerCase()}-${row[0].toLowerCase().replaceAll(" ", "-")}.csv`, data.columns, row)}>Export row as CSV</button></TableActionMenu></td></tr>)}</tbody></table></div>{filtered.length === 0 && <div className="emptystate" role="status">No records match your search.</div>}</section>{selectedRow && <div className="modalback" onClick={(event) => { if (event.target === event.currentTarget) setSelectedRow(null); }}><section className="modal row-details-modal" role="dialog" aria-modal="true" aria-labelledby="row-details-title" onKeyDown={(event) => handleDialogKeyDown(event, () => setSelectedRow(null))}><button className="profile-close" autoFocus aria-label="Close record details" onClick={() => setSelectedRow(null)}><X size={18}/></button><h2 id="row-details-title">{selectedRow[0]}</h2><p>{page} record details</p><dl>{data.columns.map((column, index) => <div key={column}><dt>{column}</dt><dd>{selectedRow[index] ?? "—"}</dd></div>)}</dl><div className="modalactions"><button className="primary" onClick={() => setSelectedRow(null)}>Done</button></div></section></div>}</>; }
