@@ -564,6 +564,8 @@ h1, h2, h3 { color: var(--text); }
 .hero-tile { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; padding: 28px; border: 0; color: var(--on-dark); background: var(--hero-bg); }
 .hero-tile::after { content: ""; position: absolute; right: -60px; bottom: -80px; width: 240px; height: 240px; border-radius: 50%; border: 36px solid rgba(255, 255, 255, .06); pointer-events: none; }
 .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+/* With nothing waiting (no button), centre the greeting so the tall card has no empty band at the bottom */
+.hero-tile:not(:has(.hero-actions)) { justify-content: center; }
 .hero-tile .eyebrow { color: var(--on-dark-muted); }
 .hero-tile h1 { margin: 0; color: #fff; font-family: var(--font-display); font-size: 40px; line-height: 1.08; font-weight: 600; letter-spacing: -1px; }
 .hero-tile h1:focus { outline: none; }
@@ -765,7 +767,115 @@ h1, h2, h3 { color: var(--text); }
 /* Leave: late sick-leave submissions */
 .late-tag { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: var(--danger-soft); color: var(--danger); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
 .leave-request-form .leave-hint { grid-column: 1 / -1; margin: 0; }
+.leave-request-form .leave-reason { grid-column: 1 / -2; }
+/* Leave form with calendar: fields left, calendar right (stacked on small screens) */
+.leave-request-form.calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); align-items: start; gap: 24px; }
+.leave-form-fields { display: grid; gap: 14px; min-width: 0; }
+.leave-form-fields .leave-reason { grid-column: auto; }
+.leave-form-fields .form-hint { margin: 0; }
+.leave-form-fields .primary { justify-self: start; }
+.picked-range { display: grid; gap: 2px; padding: 12px 14px; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--surface-2); }
+.picked-range > span:first-child { color: var(--label); font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.picked-range strong { font-size: 16px; }
+.picked-range small { color: var(--muted); font-size: 12.5px; }
+.picked-range .late-tag { justify-self: start; margin-top: 6px; }
+.range-cal { padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.range-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.range-cal-head strong { font-size: 14.5px; }
+.range-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.range-cal-dow { padding: 4px 0; text-align: center; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.range-cal-dow.weekend { color: var(--warning); }
+.range-cal-day { aspect-ratio: 1; min-height: 34px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.range-cal-day:hover:not(:disabled) { background: var(--primary-soft); }
+.range-cal-day.weekend { background: repeating-linear-gradient(135deg, var(--warning-soft) 0 4px, transparent 4px 8px); color: var(--muted); }
+.range-cal-day:disabled { cursor: not-allowed; }
+.range-cal-day:disabled:not(.weekend) { color: var(--line-strong); }
+.range-cal-day.blocked { background: var(--soft); text-decoration: line-through; }
+.range-cal-day.today { box-shadow: inset 0 0 0 1.5px var(--primary); }
+.range-cal-day.in-range:not(.weekend) { background: var(--primary-soft); color: var(--primary-ink); font-weight: 700; }
+.range-cal-day.edge { background: var(--primary) !important; color: var(--on-primary) !important; font-weight: 700; }
+.range-cal-key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; color: var(--muted); font-size: 12px; }
+.range-cal-key span { display: inline-flex; align-items: center; gap: 6px; }
+.range-cal-key i { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line); }
+.range-cal-key .k-weekend { background: repeating-linear-gradient(135deg, var(--warning-soft) 0 3px, transparent 3px 6px); border-color: var(--warning); }
+.range-cal-key .k-work { background: var(--surface); border-color: var(--muted); }
+.range-cal-key .k-picked { background: var(--primary); border-color: var(--primary); }
+.range-cal-key .k-blocked { background: var(--soft); }
+/* One column on small screens, in the order you fill it: leave type → calendar → selected days → reason → submit */
+@media (max-width: 900px) {
+  .leave-request-form.calendar-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .leave-request-form.calendar-layout .leave-form-fields { display: contents; }
+  .leave-request-form.calendar-layout .leave-form-fields > * { order: 3; }
+  .leave-request-form.calendar-layout .leave-form-fields > label:first-child { order: 1; }
+  /* Keep day cells a comfortable size on tablets instead of stretching across the whole card. */
+  .leave-request-form.calendar-layout .range-cal { order: 2; width: 100%; max-width: 440px; justify-self: center; }
+  .leave-request-form.calendar-layout .primary { justify-self: stretch; }
+}
+
+/* Admin leave list rows */
+.leave-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.leave-row:last-child { border-bottom: 0; }
+.leave-row .leave-identity { display: grid; gap: 2px; }
+.leave-row .leave-identity .late-tag { justify-self: start; margin-top: 6px; }
+.leave-side { display: flex; align-items: center; gap: 10px; }
+.leave-side .leave-buttons { width: auto; padding: 0; }
+@media (max-width: 640px) {
+  .leave-row { gap: 10px; padding: 12px 0; }
+  .leave-side { flex-direction: column; align-items: flex-end; gap: 8px; }
+  .leave-side .leave-buttons .outline { width: 38px; height: 38px; padding: 0; border-radius: 50%; }
+  .leave-side .btn-text { display: none; }
+  .leave-request-form + *, .panel-tools { width: 100%; }
+  /* Each filter keeps its full label; a third one wraps onto its own row instead of being cut off. */
+  .panel-tools { gap: 8px; }
+  .panel-tools .filterselect { flex: 1 1 auto; min-width: 0; padding: 0 10px; }
+}
+
+.leave-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 14px; }
+.leave-summary span { padding: 4px 12px; border-radius: 999px; background: var(--soft); color: var(--text-2); font-size: 12.5px; }
+.leave-summary b { color: var(--text); }
+.panel-tools { flex-wrap: wrap; }
+.leave-request-form textarea { min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 400; resize: vertical; outline: 0; }
+.leave-request-form textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+@media (max-width: 1024px) { .leave-request-form .leave-reason { grid-column: 1 / -1; } }
 .leave-request-form .auth-error { grid-column: 1 / -1; }
+
+.primary.danger-fill { background: var(--alert); color: var(--on-alert); }
+.primary.danger-fill:hover { background: color-mix(in srgb, var(--alert) 85%, #000); }
+.primary:disabled, .outline:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* Inactive employees are greyed out in tables */
+.table tbody tr.row-inactive td { opacity: .5; }
+.table tbody tr.row-inactive:hover td { opacity: .8; }
+
+/* Skills and certificates */
+.skill-form { display: grid; grid-template-columns: minmax(0, 1fr) 170px auto; align-items: end; gap: 12px; margin-bottom: 18px; }
+.cert-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.skill-form label, .cert-form label { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.skill-form input, .skill-form select, .cert-form input { height: 42px; min-width: 0; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--text); font-size: 14px; font-weight: 400; outline: 0; }
+.skill-form input:focus, .skill-form select:focus, .cert-form input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+.skill-form .primary { height: 42px; }
+.skill-form .wide, .cert-form .wide { grid-column: 1 / -1; }
+.cert-form .file-field span { display: inline-flex; align-items: center; gap: 6px; }
+.cert-form input[type="file"] { height: auto; padding: 8px; font-size: 13px; }
+.skills-empty { margin: 0; color: var(--muted); font-size: 13.5px; }
+.skill-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.skill-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.skill-chip.level-advanced { border-color: color-mix(in srgb, var(--success) 45%, var(--line)); }
+.skill-chip.level-intermediate { border-color: color-mix(in srgb, var(--info) 40%, var(--line)); }
+.skill-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.skill-chip select { height: 26px; padding: 0 6px; border: 0; border-radius: 999px; background: var(--soft); color: var(--text-2); font-size: 12px; font-weight: 600; }
+.skill-remove { width: 24px; height: 24px; display: grid; place-items: center; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.skill-remove:hover { background: var(--danger-soft); color: var(--danger); }
+.cert-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.cert-card { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.cert-icon { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 10px; background: var(--warning-soft); color: var(--warning); }
+.cert-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.cert-body strong { font-size: 14px; overflow-wrap: anywhere; }
+.cert-body small { color: var(--muted); font-size: 12.5px; }
+.cert-links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
+.cert-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--primary-ink); font-size: 12.5px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+.cert-links a:hover { text-decoration: underline; }
+@media (max-width: 640px) { .skill-form, .cert-form { grid-template-columns: 1fr; } }
 
 /* Work from home */
 .wfh-form { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -836,9 +946,11 @@ h1, h2, h3 { color: var(--text); }
   .bento .span-6 { grid-column: span 12; }
   .bento .span-3, .bento .stat.span-4 { grid-column: span 6; }
   .bento .stat.with-chart { grid-column: span 12; }
+  /* A row of three stat cards: the third one takes the full width instead of leaving a gap beside it. */
+  .bento > .stat.span-4:is(:first-child, :not(.stat.span-4) + .stat) + .stat.span-4 + .stat.span-4:not(:has(+ .stat.span-4)) { grid-column: span 12; }
   .stat.with-chart .trend > span { display: inline; }
   .hero-tile { padding: 20px; gap: 18px; }
-  .hero-top { flex-direction: column-reverse; gap: 10px; }
+  .hero-top { flex-direction: column; gap: 10px; } /* same order as desktop: greeting first, then the clock */
   .live-clock { justify-items: start; text-align: left; }
   .live-clock-time { font-size: 30px; }
   .hero-tile h1 { font-size: 28px; }

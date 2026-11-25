@@ -1,7 +1,7 @@
 import { CalendarDays, CheckCheck } from "lucide-react";
 import MiniDonut from "@/components/ui/MiniDonut";
 import type { Announcement, DemoUser, EmployeeAttendance, PersonalLeave } from "@/lib/types";
-import { greeting, todayLabel } from "@/lib/utils";
+import { todayLabel } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Bento from "@/components/ui/Bento";
 import { Card, PanelHeader } from "@/components/ui/Card";
@@ -24,7 +24,7 @@ export default function EmployeeDashboard({ user, checkedIn, attendance, onToggl
   const count = (status: string) => leaves.filter((item) => item.status === status).length;
   const pending = count("Pending");
   return <Bento>
-    <HeroTile className="span-7" eyebrow={todayLabel()} title={`${greeting()}, ${user.name.split(" ")[0]}`}
+    <HeroTile className="span-7" eyebrow={todayLabel()} title={`Hello ${user.name.split(" ")[0]} 👋`}
       subtitle={<>You have <b>2 tasks</b> in progress and <b>12 days</b> of leave left this year.</>}
       actions={<><button className="primary" onClick={() => onNavigate("Leave management")}><CalendarDays size={15} /> Request time off</button><button className="outline" onClick={() => onNavigate("Tasks")}><CheckCheck size={15} /> My tasks</button></>} />
     <AttendanceCard className="span-5 employee-dashboard-attendance" attendance={attendance} checkedIn={checkedIn} onToggle={onToggleAttendance}

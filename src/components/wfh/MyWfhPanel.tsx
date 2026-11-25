@@ -8,28 +8,34 @@ import { localDateKey } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import { Card, PanelHeader } from "@/components/ui/Card";
 import ListRow from "@/components/ui/ListRow";
+import DateRangeCalendar from "@/components/ui/DateRangeCalendar";
 
 export type WfhDraft = Pick<WfhRequest, "start" | "end" | "reason">;
 
-/** Employee view: request work from home, then see past requests and their status. */
+/**
+ * Employee view: pick work-from-home days on the same calendar as leave requests
+ * (Saudi weekend Fri/Sat shaded), then see past requests and their status.
+ */
 export default function MyWfhPanel({ requests, onSubmit }: { requests: WfhRequest[]; onSubmit: (draft: WfhDraft) => void }) {
   const today = localDateKey(new Date());
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const days = start && end && end >= start ? workdaysIn(start, end).length : 0;
+  const until = end || start;
+  const days = start ? workdaysIn(start, until).length : 0;
+  // Workdays already covered by an open request.
+  const blocked = requests.filter((r) => r.status !== "Rejected").flatMap((r) => workdaysIn(r.start, r.end));
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!start || !end) { setError("Choose a start and end date."); return; }
-    if (end < start) { setError("The end date must be on or after the start date."); return; }
+    if (!start) { setError("Pick your first day at home on the calendar."); return; }
     if (start < today) { setError("Requests can only be for today or later."); return; }
     if (days === 0) { setError("Those dates fall on a weekend (Friday or Saturday)."); return; }
+    if (requests.some((r) => r.status !== "Rejected" && r.start <= until && r.end >= start)) { setError("You already have a request covering some of these days."); return; }
     if (!reason.trim()) { setError("Add a short reason for your manager."); return; }
-    if (requests.some((r) => r.status !== "Rejected" && r.start <= end && r.end >= start)) { setError("You already have a request covering some of these days."); return; }
     setError("");
-    onSubmit({ start, end, reason: reason.trim() });
+    onSubmit({ start, end: until, reason: reason.trim() });
     setStart(""); setEnd(""); setReason("");
   };
 
@@ -37,16 +43,20 @@ export default function MyWfhPanel({ requests, onSubmit }: { requests: WfhReques
 
   return <>
     <Card>
-      <PanelHeader title="Request work from home" subtitle="Your manager will be notified and can approve or reject it." />
-      <form className="wfh-form" onSubmit={submit} noValidate>
-        <label>Start date<input type="date" min={today} value={start} onChange={(e) => { setStart(e.target.value); if (!end || end < e.target.value) setEnd(e.target.value); setError(""); }} /></label>
-        <label>End date<input type="date" min={start || today} value={end} onChange={(e) => { setEnd(e.target.value); setError(""); }} /></label>
-        <label className="wide">Reason<textarea rows={3} placeholder="e.g. Waiting for a delivery at home" value={reason} onChange={(e) => { setReason(e.target.value); setError(""); }} /></label>
-        <div className="wfh-form-foot wide">
-          <span className="form-hint">{days > 0 ? <>That's <b>{days} workday{days === 1 ? "" : "s"}</b> (Sun–Thu).</> : "Pick your dates to see how many workdays this covers."}</span>
+      <PanelHeader title="Request work from home" subtitle="Pick your days on the calendar. Your manager will be notified and can approve or reject it." />
+      <form className="leave-request-form calendar-layout" onSubmit={submit} noValidate>
+        <div className="leave-form-fields">
+          <div className="picked-range">
+            <span>Selected</span>
+            <strong>{start ? formatRange(start, until) : "No days picked yet"}</strong>
+            <small>{start ? `${days} workday${days === 1 ? "" : "s"} (Sun–Thu)` : "Click a start day, then an end day"}</small>
+          </div>
+          <label className="leave-reason">Reason<textarea rows={3} maxLength={300} placeholder="e.g. Waiting for a delivery at home" value={reason} onChange={(e) => { setReason(e.target.value); setError(""); }} /></label>
+          {error && <p className="auth-error" role="alert">{error}</p>}
           <button className="primary" type="submit"><Send size={15} /> Send request</button>
         </div>
-        {error && <p className="auth-error wide" role="alert">{error}</p>}
+        <DateRangeCalendar start={start} end={end} minDate={today} blocked={blocked}
+          onChange={(s, e) => { setStart(s); setEnd(e); setError(""); }} />
       </form>
     </Card>
     <Card className="employee-leave-history">

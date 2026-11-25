@@ -1,5 +1,5 @@
-import { Activity, Banknote, Bell, Building2, CalendarDays, CheckCheck, Clock3, FileText, FolderKanban, Laptop, LayoutDashboard, Package, Settings, Users, Wallet } from "lucide-react";
-import type { Announcement, Dataset, Department, DemoUser, Employee, InboxNotice, Insurance, Leave, NavGroup, NavItem, PersonalLeave, SalaryPackage, WfhRequest, WorkMode } from "./types";
+import { Activity, Banknote, Bell, Building2, CalendarDays, CheckCheck, Clock3, FileText, FolderKanban, GraduationCap, Laptop, LayoutDashboard, Package, Settings, Users, Wallet } from "lucide-react";
+import type { Announcement, Certificate, Dataset, Department, DemoUser, Employee, InboxNotice, Insurance, Leave, NavGroup, NavItem, PersonalLeave, SalaryPackage, Skill, SkillLevel, WfhRequest, WorkMode } from "./types";
 
 /* Avatar tints from the brand palette */
 export const avatarTints = ["#bbefff", "#befcff", "#fee9d5", "#fce2e0", "#fdfcdc"];
@@ -45,7 +45,27 @@ export const workModes: WorkMode[] = ["Office", "Remote"];
 const pay = (basic: number, other: number): SalaryPackage => ({ basic, housing: basic * 0.25, transport: basic * 0.1, other });
 const insured = (provider: string): Insurance => ({ provider, insuredCompany: company.name });
 
-export const seedEmployees: Employee[] = [
+export const skillLevels: SkillLevel[] = ["Beginner", "Intermediate", "Advanced"];
+/** Suggestions shown while typing a skill (anything else can be typed too). */
+export const skillSuggestions = ["HTML", "CSS", "JavaScript", "TypeScript", "React", "Next.js", "Node.js", "Python", "SQL", "Excel", "Power BI", "Figma", "Adobe XD", "UI design", "UX research", "Project management", "Agile / Scrum", "Accounting", "IFRS", "Zakat and VAT", "Payroll", "Recruitment", "Labour law (KSA)", "Digital marketing", "SEO", "Content writing", "Public speaking", "Arabic", "English"];
+
+let nextTalentId = 1;
+const sk = (name: string, level: SkillLevel): Skill => ({ id: nextTalentId++, name, level });
+const cert = (name: string, issuer: string, issued: string, link?: string): Certificate => ({ id: nextTalentId++, name, issuer, issued, link });
+
+/** Demo skills and certificates per employee id. */
+const seedTalent: Record<string, { skills: Skill[]; certificates: Certificate[] }> = {
+  "EMP-1048": { skills: [sk("Accounting", "Advanced"), sk("Excel", "Advanced"), sk("Zakat and VAT", "Intermediate"), sk("Power BI", "Beginner")], certificates: [cert("SOCPA Fellowship", "SOCPA", "2023-06-14")] },
+  "EMP-1046": { skills: [sk("Figma", "Advanced"), sk("UI design", "Advanced"), sk("HTML", "Intermediate"), sk("CSS", "Intermediate"), sk("UX research", "Beginner")], certificates: [cert("Google UX Design Certificate", "Google / Coursera", "2025-03-02", "https://www.coursera.org/professional-certificates/google-ux-design")] },
+  "EMP-1042": { skills: [sk("Figma", "Advanced"), sk("UX research", "Advanced"), sk("Adobe XD", "Intermediate")], certificates: [] },
+  "EMP-1038": { skills: [sk("TypeScript", "Advanced"), sk("React", "Advanced"), sk("Node.js", "Advanced"), sk("Agile / Scrum", "Intermediate")], certificates: [cert("AWS Certified Solutions Architect – Associate", "Amazon Web Services", "2024-09-20")] },
+  "EMP-1035": { skills: [sk("Digital marketing", "Advanced"), sk("SEO", "Intermediate"), sk("Content writing", "Intermediate")], certificates: [cert("Google Ads Search Certification", "Google", "2025-01-11")] },
+  "EMP-1029": { skills: [sk("Recruitment", "Advanced"), sk("Labour law (KSA)", "Intermediate"), sk("Payroll", "Intermediate")], certificates: [cert("SHRM-CP", "SHRM", "2022-11-30")] },
+  "EMP-1024": { skills: [sk("JavaScript", "Advanced"), sk("React", "Intermediate"), sk("Python", "Intermediate"), sk("SQL", "Beginner")], certificates: [] },
+};
+const withTalent = (e: Omit<Employee, "skills" | "certificates">): Employee => ({ ...e, ...(seedTalent[e.id] ?? { skills: [], certificates: [] }) });
+
+export const seedEmployees: Employee[] = ([
   { id: "EMP-1048", name: "Ashik", email: "ashik@acme.co", department: "Finance", role: "Accountant", status: "Active", initials: "AK", color: avatarTints[0], phone: "+966 59 128 6605", extension: "2512", workMode: "Office", salary: pay(10000, 500), insurance: insured("Al Rajhi Takaful") },
   { id: "EMP-1046", name: "Nawas", email: "nawas@acme.co", department: "Design", role: "Product Designer", status: "Active", initials: "NA", color: avatarTints[1], phone: "+966 55 730 4418", extension: "2146", workMode: "Office", salary: pay(12000, 800), insurance: insured("Tawuniya") },
   { id: "EMP-1042", name: "Riyas", email: "riyas@acme.co", department: "Design", role: "Senior Product Designer", status: "Active", initials: "RI", color: avatarTints[2], phone: "+966 55 214 7830", extension: "2141", workMode: "Office", salary: pay(14000, 600), insurance: insured("Tawuniya") },
@@ -53,7 +73,7 @@ export const seedEmployees: Employee[] = [
   { id: "EMP-1035", name: "Umar", email: "umar@acme.co", department: "Marketing", role: "Marketing Manager", status: "Active", initials: "UM", color: avatarTints[4], phone: "+966 54 902 1187", extension: "2420", workMode: "Remote", salary: pay(18000, 1000), insurance: insured("Medgulf") },
   { id: "EMP-1029", name: "Yahya", email: "yahya@acme.co", department: "Human Resources", role: "HR Specialist", status: "On leave", initials: "YA", color: avatarTints[0], phone: "+966 56 447 3019", extension: "2205", workMode: "Office", salary: pay(11000, 500), insurance: insured("Tawuniya") },
   { id: "EMP-1024", name: "Ashraf", email: "ashraf@acme.co", department: "Engineering", role: "Software Engineer", status: "Active", initials: "AF", color: avatarTints[1], phone: "+966 53 610 9952", extension: "2318", workMode: "Remote", salary: pay(15000, 750), insurance: insured("Bupa Arabia") },
-];
+] as Omit<Employee, "skills" | "certificates">[]).map(withTalent);
 
 /** Fills in fields that older saved employees (or quick-added ones) don't have yet. */
 export function withEmployeeDefaults(person: Partial<Employee> & Pick<Employee, "id" | "name">): Employee {
@@ -61,16 +81,27 @@ export function withEmployeeDefaults(person: Partial<Employee> & Pick<Employee, 
   return {
     email: `${person.name.toLowerCase().replace(/\s+/g, ".")}@acme.co`, department: "Operations", role: "Team member", status: "Active", initials: person.name.slice(0, 2).toUpperCase(), color: avatarTints[0],
     phone: "—", extension: "—", workMode: "Office", salary: { basic: 0, housing: 0, transport: 0, other: 0 }, insurance: insured("Tawuniya"),
+    skills: [], certificates: [],
     ...seed,
     ...person,
     ...(seed && !person.salary ? { salary: seed.salary } : {}),
+    ...(seed && !person.skills ? { skills: seed.skills } : {}),
+    ...(seed && !person.certificates ? { certificates: seed.certificates } : {}),
   } as Employee;
 }
 
+/**
+ * Every leave request the admin sees. Nawas's requests share their id with seedPersonalLeave,
+ * so approving one here updates the employee's own history too.
+ */
 export const seedLeaves: Leave[] = [
-  { name: "Yahya", kind: "Annual leave", dates: "Oct 24 – 26", initials: "YA", color: avatarTints[3], status: "Pending" },
-  { name: "Ashraf", kind: "Sick leave", dates: "Oct 25", initials: "AF", color: avatarTints[4], status: "Pending" },
-  { name: "Ashik", kind: "Annual leave", dates: "Oct 28 – Nov 1", initials: "AK", color: avatarTints[0], status: "Pending" },
+  { id: 7101, name: "Yahya", kind: "Annual leave", dates: "Dec 7 – 9, 2026", initials: "YA", color: avatarTints[3], status: "Pending", reason: "Family wedding in Jeddah." },
+  { id: 7002, name: "Nawas", kind: "Personal day", dates: "Dec 3, 2026", initials: "NA", color: avatarTints[1], status: "Pending", reason: "Moving to a new apartment." },
+  { id: 7102, name: "Ashraf", kind: "Sick leave", dates: "Nov 24, 2026", initials: "AF", color: avatarTints[4], status: "Pending", reason: "Fever; doctor advised one day of rest.", late: true },
+  { id: 7103, name: "Ashik", kind: "Annual leave", dates: "Dec 14 – 17, 2026", initials: "AK", color: avatarTints[0], status: "Pending", reason: "Umrah trip with family." },
+  { id: 7001, name: "Nawas", kind: "Annual leave", dates: "Nov 17 – 19, 2026", initials: "NA", color: avatarTints[1], status: "Approved", reason: "Short holiday with family." },
+  { id: 7104, name: "Mansoor", kind: "Annual leave", dates: "Nov 2 – 5, 2026", initials: "MA", color: avatarTints[3], status: "Approved", reason: "Visiting family in Riyadh." },
+  { id: 7105, name: "Umar", kind: "Personal day", dates: "Oct 22, 2026", initials: "UM", color: avatarTints[2], status: "Rejected", reason: "Car registration renewal; clashed with the campaign launch." },
 ];
 
 /** Earlier demo names, so data already saved in the browser is renamed on load. */
@@ -103,8 +134,10 @@ export function seedWfhRequests(): WfhRequest[] {
 }
 
 export const seedPersonalLeave: PersonalLeave[] = [
-  { kind: "Annual leave", dates: "Nov 18 – 20", status: "Approved" },
-  { kind: "Personal day", dates: "Dec 04", status: "Pending" },
+  { id: 7001, kind: "Annual leave", dates: "Nov 17 – 19, 2026", start: "2026-11-17", end: "2026-11-19", status: "Approved", reason: "Short holiday with family." },
+  { id: 7002, kind: "Personal day", dates: "Dec 3, 2026", start: "2026-12-03", end: "2026-12-03", status: "Pending", reason: "Moving to a new apartment." },
+  { kind: "Sick leave", dates: "Sep 8, 2026", start: "2026-09-08", end: "2026-09-08", status: "Approved", reason: "Flu; doctor's note attached." },
+  { kind: "Annual leave", dates: "Aug 2 – 6, 2026", start: "2026-08-02", end: "2026-08-06", status: "Rejected", reason: "Summer trip; clashed with the product launch." },
 ];
 
 export const demoUsers: DemoUser[] = [
@@ -113,11 +146,11 @@ export const demoUsers: DemoUser[] = [
 ];
 
 
-export const employeeNavLabels = ["Dashboard", "Attendance", "Leave management", "Work from home", "My salary", "Tasks", "Documents", "Announcements"];
+export const employeeNavLabels = ["Dashboard", "Attendance", "Leave management", "Work from home", "My salary", "My skills", "Tasks", "Documents", "Announcements"];
 
 export const navGroups: NavGroup[] = [
   { title: "Overview", items: [{ label: "Dashboard", icon: LayoutDashboard }, { label: "Reports", icon: Activity }] },
-  { title: "People", items: [{ label: "Employees", icon: Users }, { label: "Departments", icon: Building2 }, { label: "Attendance", icon: Clock3 }, { label: "Leave management", icon: CalendarDays, count: "leave" }, { label: "Work from home", icon: Laptop, count: "wfh" }, { label: "My salary", icon: Banknote, employeeOnly: true }] },
+  { title: "People", items: [{ label: "Employees", icon: Users }, { label: "Departments", icon: Building2 }, { label: "Attendance", icon: Clock3 }, { label: "Leave management", icon: CalendarDays, count: "leave" }, { label: "Work from home", icon: Laptop, count: "wfh" }, { label: "My salary", icon: Banknote, employeeOnly: true }, { label: "My skills", icon: GraduationCap, employeeOnly: true }] },
   { title: "Work", items: [{ label: "Tasks", icon: CheckCheck }, { label: "Projects", icon: FolderKanban }, { label: "Documents", icon: FileText }, { label: "Announcements", icon: Bell }] },
   { title: "Operations", items: [{ label: "Inventory", icon: Package }, { label: "Finance", icon: Wallet }] },
   { title: "System", items: [{ label: "Settings", icon: Settings }] },
@@ -140,7 +173,7 @@ export const toneByStatus: Record<string, string> = {
   Pending: "warning", "Low stock": "warning", Late: "warning", "On leave": "warning", Medium: "warning", Important: "warning", Department: "warning",
   Rejected: "danger", Overdue: "danger", High: "danger", Restricted: "danger",
   "In progress": "info", "Workday complete": "info", Normal: "info",
-  "Remote work": "violet", Remote: "violet", Office: "info", Paid: "success", Leave: "warning", Working: "success",
+  "Remote work": "violet", Remote: "violet", Office: "info", Paid: "success", Leave: "warning", Working: "success", Inactive: "neutral", Beginner: "neutral", Intermediate: "info", Advanced: "success",
 };
 
 export const pageDescriptions: Record<string, string> = {
@@ -157,6 +190,7 @@ export const pageDescriptions: Record<string, string> = {
   Reports: "Understand the health of your organization.",
   "My salary": "Your monthly pay, how it is split up, and your payslips.",
   "Work from home": "Request days to work remotely and track their approval.",
+  "My skills": "Keep your skills and certificates up to date so the company knows what you can do.",
   Settings: "Set up your workspace and organization preferences.",
 };
 

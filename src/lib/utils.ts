@@ -42,6 +42,9 @@ export function downloadCsv(filename: string, columns: string[], rows: string[][
   URL.revokeObjectURL(url);
 }
 
+/** Lower-case, dash-separated piece for a file name ("Human Resources" → "human-resources"). */
+export function fileSlug(text: string) { return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+
 /* Accessibility: Escape closes, Tab stays inside the dialog */
 export function handleDialogKeyDown(event: KeyboardEvent<HTMLElement>, close: () => void) {
   if (event.key === "Escape") { event.preventDefault(); close(); return; }

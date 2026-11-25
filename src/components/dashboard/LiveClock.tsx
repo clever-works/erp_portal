@@ -7,9 +7,7 @@ export default function LiveClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(timer); }, []);
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone.replace(/_/g, " ");
   return <div className="live-clock" aria-label={`Current time ${time}`}>
     <span className="live-clock-time">{time}<small>{String(now.getSeconds()).padStart(2, "0")}</small></span>
-    <span className="live-clock-zone">{zone}</span>
   </div>;
 }

@@ -25,7 +25,7 @@ export default function EmployeeTable({ employees, onSelect, variant = "full" }:
         <th scope="col">Status</th>
         <th scope="col" className="actions-col"><span className="sr-only">Actions</span></th>
       </tr></thead>
-      <tbody>{employees.map((person) => <tr key={person.id}>
+      <tbody>{employees.map((person) => <tr key={person.id} className={person.status === "Inactive" ? "row-inactive" : undefined}>
         <td><div className="person"><MiniAvatar initials={person.initials} color={person.color} /><div><button className="person-link" onClick={() => onSelect(person)}>{person.name}</button></div></div></td>
         {full && <><td className="muted-cell nowrap">{person.id}</td><td>{person.role}</td></>}
         <td className="muted-cell">{person.email}</td>

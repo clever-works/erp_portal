@@ -21,12 +21,13 @@ type TopbarProps = {
   user: DemoUser;
   onViewProfile: (trigger: HTMLElement) => void;
   onOpenSettings?: () => void;
+  onResetData?: () => void;
   onSignOut: () => void;
 };
 
 /** Sticky top bar: breadcrumb, notifications, theme toggle and account menu. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- navItems/onNavigate are kept for the QuickSearch comeback
-export default function Topbar({ title, menuOpen, onToggleMenu, onCloseMenu, navItems, onNavigate, notices, onMarkAllRead, onOpenNotice, dark, onToggleTheme, user, onViewProfile, onOpenSettings, onSignOut }: TopbarProps) {
+export default function Topbar({ title, menuOpen, onToggleMenu, onCloseMenu, navItems, onNavigate, notices, onMarkAllRead, onOpenNotice, dark, onToggleTheme, user, onViewProfile, onOpenSettings, onResetData, onSignOut }: TopbarProps) {
   const [openPanel, setOpenPanel] = useState<"notifications" | "profile" | null>(null);
   const toggle = (panel: "notifications" | "profile") => setOpenPanel(openPanel === panel ? null : panel);
   const close = () => setOpenPanel(null);
@@ -41,6 +42,7 @@ export default function Topbar({ title, menuOpen, onToggleMenu, onCloseMenu, nav
     <ProfileMenu user={user} open={openPanel === "profile"} onToggle={() => toggle("profile")} onClose={close}
       onViewProfile={(event: MouseEvent<HTMLButtonElement>) => { onViewProfile(event.currentTarget); close(); }}
       onOpenSettings={onOpenSettings && (() => { close(); onOpenSettings(); })}
+      onResetData={onResetData && (() => { close(); onResetData(); })}
       onSignOut={onSignOut} />
   </header>;
 }

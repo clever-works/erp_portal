@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
-import { Download, Megaphone, Plus } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Megaphone, Plus } from "lucide-react";
 import { avatarTints, demoUsers, employeeNavLabels, legacyLogins, legacyPeople, nav, navGroups, seedAnnouncements, seedDepartments, seedEmployees, seedLeaves, seedNotices, seedPersonalLeave, seedWfhRequests, withEmployeeDefaults } from "@/lib/data";
 import type { Announcement, Department, DemoUser, Employee, EmployeeAttendance, InboxNotice, Leave, NewEmployee, PersonalLeave, ProfileTarget, WfhRequest } from "@/lib/types";
 import { formatRange, remoteOverrides } from "@/lib/wfh";
@@ -12,9 +12,9 @@ import { audienceLabel, noticeVisibleTo, reaches } from "@/lib/audience";
 import AddDepartmentModal from "@/components/departments/AddDepartmentModal";
 import AnnouncementComposer, { type AnnouncementDraft } from "@/components/announcements/AnnouncementComposer";
 import AnnouncementFeed from "@/components/announcements/AnnouncementFeed";
-import { downloadCsv, formatAttendanceTime, initialsOf, localDateKey, migratePerson, pageDescription } from "@/lib/utils";
-import { grossOf } from "@/lib/payroll";
+import { formatAttendanceTime, initialsOf, localDateKey, migratePerson, pageDescription } from "@/lib/utils";
 import SalaryPanel from "@/components/payroll/SalaryPanel";
+import MySkillsPanel from "@/components/skills/MySkillsPanel";
 
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -33,6 +33,7 @@ import EmployeeLeavePanel from "@/components/leave/EmployeeLeavePanel";
 import TeamAttendancePanel from "@/components/attendance/TeamAttendancePanel";
 import EmployeeAttendancePanel from "@/components/attendance/EmployeeAttendancePanel";
 import SettingsPanel from "@/components/settings/SettingsPanel";
+import ResetDataModal from "@/components/settings/ResetDataModal";
 import ModulePanel from "@/components/modules/ModulePanel";
 
 type SavedState = { employees?: Employee[]; leaves?: Leave[]; dark?: boolean; checkedIn?: boolean; employeeCheckedIn?: boolean; employeeAttendance?: EmployeeAttendance | null; employeeLeave?: PersonalLeave[]; notices?: InboxNotice[]; departments?: Department[]; announcements?: Announcement[]; wfhRequests?: WfhRequest[] };
@@ -56,6 +57,7 @@ export default function ERPPortal() {
   const [addingEmployee, setAddingEmployee] = useState(false);
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [composing, setComposing] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const [profileView, setProfileView] = useState<ProfileTarget | null>(null);
   const [departments, setDepartments] = useState(seedDepartments);
   const [announcements, setAnnouncements] = useState(seedAnnouncements);
@@ -82,7 +84,11 @@ export default function ERPPortal() {
           const missing = seedEmployees.filter((seed) => !saved.some((person) => person.id === seed.id));
           setEmployees([...missing, ...saved]);
         }
-        if (state.leaves) setLeaves(state.leaves.map((leave) => migratePerson(leave, legacyPeople)));
+        if (state.leaves) {
+          // Older saves held demo requests without ids (so approvals couldn't reach the employee); swap those for the current demo list.
+          const tracked = state.leaves.filter((leave) => leave.id).map((leave) => migratePerson(leave, legacyPeople));
+          setLeaves(tracked.length === state.leaves.length ? tracked : [...tracked, ...seedLeaves.filter((seed) => !tracked.some((leave) => leave.id === seed.id))]);
+        }
         const savedTheme = localStorage.getItem("nexus-theme");
         setDark(savedTheme ? savedTheme === "dark" : !!state.dark);
         setCheckedIn(!!state.checkedIn);
@@ -90,7 +96,12 @@ export default function ERPPortal() {
         const attendance = state.employeeAttendance ?? (state.employeeCheckedIn ? { date: today, checkInAt: `${today}T09:14:00`, checkOutAt: null } : null);
         setEmployeeAttendance(attendance);
         setEmployeeCheckedIn(!!attendance && attendance.date === today && !attendance.checkOutAt);
-        if (state.employeeLeave) setEmployeeLeave(state.employeeLeave);
+        if (state.employeeLeave) {
+          // Older saves stored demo requests without real dates; swap those for the current demo requests.
+          const dated = state.employeeLeave.filter((leave) => leave.start && leave.end)
+            .map((leave) => leave.id ? leave : { ...leave, id: seedPersonalLeave.find((seed) => seed.kind === leave.kind && seed.start === leave.start)?.id });
+          setEmployeeLeave(dated.length === state.employeeLeave.length ? dated : [...dated, ...seedPersonalLeave.filter((seed) => !dated.some((leave) => leave.kind === seed.kind && leave.start === seed.start))]);
+        }
         if (state.departments) setDepartments(state.departments);
         if (state.announcements) setAnnouncements(state.announcements);
         if (state.wfhRequests) setWfhRequests(state.wfhRequests);
@@ -106,7 +117,9 @@ export default function ERPPortal() {
 
   useEffect(() => {
     if (!hydrated) return;
-    localStorage.setItem("nexus-erp", JSON.stringify({ employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, departments, announcements, wfhRequests }));
+    // Uploaded certificate files live here too; if the browser's storage is full, keep working and say so.
+    try { localStorage.setItem("nexus-erp", JSON.stringify({ employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, departments, announcements, wfhRequests })); }
+    catch { setToast("Browser storage is full: remove a large certificate file so changes can be saved"); }
   }, [employees, leaves, dark, checkedIn, employeeCheckedIn, employeeAttendance, employeeLeave, notices, departments, announcements, wfhRequests, hydrated]);
 
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 2600); return () => clearTimeout(timer); }, [toast]);
@@ -134,10 +147,9 @@ export default function ERPPortal() {
     requestAnimationFrame(() => document.querySelector<HTMLElement>(".content h1")?.focus());
   };
 
-  const openAddEmployee = (event: MouseEvent<HTMLButtonElement>) => { returnFocusRef.current = event.currentTarget; setAddingEmployee(true); };
   const createEmployee = (draft: NewEmployee) => {
     const nextNumber = Math.max(1050, ...employees.map((e) => Number(e.id.replace(/\D/g, "")) || 0)) + 1;
-    setEmployees([{ ...draft, id: `EMP-${nextNumber}`, email: `${draft.name.toLowerCase().replace(/\s+/g, ".")}@acme.co`, status: "Active", initials: initialsOf(draft.name), color: avatarTints[employees.length % avatarTints.length] }, ...employees]);
+    setEmployees([{ ...draft, id: `EMP-${nextNumber}`, email: `${draft.name.toLowerCase().replace(/\s+/g, ".")}@acme.co`, status: "Active", initials: initialsOf(draft.name), color: avatarTints[employees.length % avatarTints.length], skills: [], certificates: [] }, ...employees]);
     setAddingEmployee(false); notify("Employee added successfully");
   };
   const createDepartment = (department: Department) => {
@@ -168,12 +180,6 @@ export default function ERPPortal() {
     setNotices([{ id: Date.now(), title: `Work from home ${status.toLowerCase()}`, body: `Your request for ${formatRange(request.start, request.end)} was ${status.toLowerCase()}.`, time: "Just now", createdAt: now, page: "Work from home", read: false, employeeId: request.employeeId }, ...notices]);
     notify(`${request.name}'s request ${status.toLowerCase()}`);
   };
-  const exportEmployees = () => {
-    downloadCsv("nexus-employees.csv",
-      ["Employee ID", "Name", "Email", "Phone", "Extension", "Department", "Job title", "Work mode", "Basic (SAR)", "Housing (SAR)", "Transport (SAR)", "Other (SAR)", "Gross (SAR)", "Insurance provider", "Insured company", "Status"],
-      employees.map((e) => [e.id, e.name, e.email, e.phone, e.extension, e.department, e.role, e.workMode, ...[e.salary.basic, e.salary.housing, e.salary.transport, e.salary.other, grossOf(e.salary)].map(String), e.insurance.provider, e.insurance.insuredCompany, e.status]));
-    notify("Employee list exported");
-  };
   const updateLeave = (index: number, status: string) => {
     const target = leaves[index];
     setLeaves(leaves.map((item, i) => i === index ? { ...item, status } : item));
@@ -186,7 +192,7 @@ export default function ERPPortal() {
     const id = Date.now();
     setEmployeeLeave([{ ...request, id }, ...employeeLeave]);
     if (me) {
-      setLeaves([{ id, name: me.name, kind: request.kind, dates: request.dates, initials: me.initials, color: me.color, status: "Pending", late: request.late }, ...leaves]);
+      setLeaves([{ id, name: me.name, kind: request.kind, dates: request.dates, initials: me.initials, color: me.color, status: "Pending", late: request.late, reason: request.reason }, ...leaves]);
       setNotices([{ id, title: request.late ? "Late sick leave submitted" : "New leave request", body: `${me.name} requested ${request.kind.toLowerCase()} for ${request.dates}.`, time: "Just now", createdAt: new Date().toISOString(), page: "Leave management", read: false, audience: "admin" }, ...notices]);
     }
     notify(request.late ? "Sick leave submitted (marked as late)" : "Your leave request was submitted");
@@ -213,7 +219,7 @@ export default function ERPPortal() {
   if (!authUser) return <LoginScreen dark={dark} email={loginEmail} password={loginPassword} error={loginError} onEmailChange={setLoginEmail} onPasswordChange={setLoginPassword} onSubmit={signIn} onDemoFill={(user) => { setLoginEmail(user.email); setLoginPassword(user.password); setLoginError(""); }} />;
 
   /* ---------- derived ---------- */
-  const title = page === "Leave management" ? "Leave Management" : page === "My salary" ? "My Salary" : page;
+  const title = page === "Leave management" ? "Leave Management" : page === "My salary" ? "My Salary" : page === "My skills" ? "My Skills" : page;
   const allowed = (item: { label: string; employeeOnly?: boolean }) => employeeMode ? employeeNavLabels.includes(item.label) : !item.employeeOnly;
   const navItems = nav.filter(allowed);
   const visibleGroups = navGroups.map((group) => ({ ...group, items: group.items.filter(allowed) })).filter((group) => group.items.length);
@@ -234,12 +240,14 @@ export default function ERPPortal() {
 
   const renderPageBody = () => {
     switch (page) {
-      case "Employees": return <EmployeeDirectory employees={employees} onSelect={setProfileView} />;
+      case "Employees": return <EmployeeDirectory employees={employees} onSelect={setProfileView} onExported={(n) => notify(`${n} employee${n === 1 ? "" : "s"} exported`)} />;
       case "Leave management": return employeeMode
         ? <EmployeeLeavePanel leaves={employeeLeave} onSubmit={submitLeave} />
         : <LeaveRequestsPanel leaves={leaves} onUpdate={updateLeave} />;
-      case "Attendance": return <TeamAttendancePanel employees={employees} />;
+      case "Attendance": return <TeamAttendancePanel employees={employees.filter((e) => e.status !== "Inactive")} />;
       case "My salary": return <SalaryPanel employee={myRecord} notify={notify} />;
+      case "My skills": return <MySkillsPanel employee={myRecord} notify={notify}
+        onChange={(skills, certificates) => setEmployees(employees.map((e) => (e.id === myRecord.id ? { ...e, skills, certificates } : e)))} />;
       case "Departments": return <ModulePanel key={page} page={page} notify={notify} dataset={departmentDataset} />;
       case "Work from home": return employeeMode
         ? <MyWfhPanel requests={wfhRequests.filter((r) => r.employeeId === myRecord.id)} onSubmit={submitWfh} />
@@ -253,19 +261,17 @@ export default function ERPPortal() {
   const renderPage = () => {
     if (page === "Dashboard") return employeeMode
       ? <EmployeeDashboard user={authUser} checkedIn={employeeCheckedIn} attendance={todayAttendance} onToggleAttendance={toggleEmployeeAttendance} leaves={employeeLeave} announcements={myAnnouncements} onNavigate={switchPage} />
-      : <AdminDashboard user={authUser} employees={employees} leaves={leaves} pendingCount={pendingCount} onExport={exportEmployees} onAddEmployee={openAddEmployee} onUpdateLeave={updateLeave} onNavigate={switchPage} onSelectEmployee={setProfileView} />;
+      : <AdminDashboard user={authUser} employees={employees} leaves={leaves} pendingCount={pendingCount} onUpdateLeave={updateLeave} onNavigate={switchPage} onSelectEmployee={setProfileView} />;
     if (page === "Attendance" && employeeMode) return <EmployeeAttendancePanel user={authUser} employee={myRecord} checkedIn={employeeCheckedIn} attendance={todayAttendance} onToggle={toggleEmployeeAttendance} />;
-    const newLabel = page === "Employees" ? "Add employee" : `New ${page === "Leave management" ? "request" : page.replace(/s$/, "").toLowerCase()}`;
+    // Only pages with a real "create" action get a header button (no placeholder buttons).
+    const headerActions: Record<string, { label: string; open: (el: HTMLElement) => void }> = {
+      Employees: { label: "Add employee", open: (el) => { returnFocusRef.current = el; setAddingEmployee(true); } },
+      Departments: { label: "New department", open: (el) => { returnFocusRef.current = el; setAddingDepartment(true); } },
+      Announcements: { label: "New announcement", open: (el) => { returnFocusRef.current = el; setComposing(true); } },
+    };
+    const action = employeeMode ? undefined : headerActions[page];
     return <>
-      <PageHeader title={title} description={pageDescription(page)} actions={!employeeMode && page !== "Attendance" && page !== "Work from home" && <>
-        {page === "Employees" && <button className="outline" onClick={exportEmployees}><Download size={15} /> Export CSV</button>}
-        <button className="primary" onClick={(event) => {
-          if (page === "Employees") openAddEmployee(event);
-          else if (page === "Departments") { returnFocusRef.current = event.currentTarget; setAddingDepartment(true); }
-          else if (page === "Announcements") { returnFocusRef.current = event.currentTarget; setComposing(true); }
-          else notify(`${title} action is ready to configure`);
-        }}>{page === "Announcements" ? <Megaphone size={15} /> : <Plus size={15} />} {newLabel}</button>
-      </>} />
+      <PageHeader title={title} description={pageDescription(page)} actions={action && <button className="primary" onClick={(event) => action.open(event.currentTarget)}>{page === "Announcements" ? <Megaphone size={15} /> : <Plus size={15} />} {action.label}</button>} />
       {renderPageBody()}
     </>;
   };
@@ -279,7 +285,7 @@ export default function ERPPortal() {
         onMarkAllRead={() => setNotices(notices.map((item) => visibleNotices.some((visible) => visible.id === item.id) ? { ...item, read: true } : item))}
         onOpenNotice={(notice) => { setNotices(notices.map((item) => item.id === notice.id ? { ...item, read: true } : item)); switchPage(notice.page); }}
         dark={dark} onToggleTheme={() => saveTheme(!dark)}
-        user={authUser} onViewProfile={(trigger) => { returnFocusRef.current = trigger; setProfileView(myProfile); }} onOpenSettings={goToSettings} onSignOut={signOut} />
+        user={authUser} onViewProfile={(trigger) => { returnFocusRef.current = trigger; setProfileView(myProfile); }} onOpenSettings={goToSettings} onResetData={() => setConfirmingReset(true)} onSignOut={signOut} />
       {menu && <MobileDrawer groups={visibleGroups} page={page} onNavigate={switchPage} badges={badges} onClose={() => setMenu(false)} />}
       <MobileTabBar labels={employeeMode ? ["Dashboard", "Attendance", "Leave management", "My salary"] : ["Dashboard", "Employees", "Attendance", "Leave management"]} items={navItems} page={page} onNavigate={switchPage} menuOpen={menu} onToggleMenu={() => setMenu(!menu)} />
       <div className="content">
@@ -291,7 +297,13 @@ export default function ERPPortal() {
     <Toast message={toast} />
     {addingEmployee && <AddEmployeeModal departments={departmentNames} onCreate={createEmployee} onClose={() => setAddingEmployee(false)} />}
     {addingDepartment && <AddDepartmentModal existing={departments} people={[authUser.name, ...employees.map((e) => e.name)]} onCreate={createDepartment} onClose={() => setAddingDepartment(false)} />}
+    {confirmingReset && <ResetDataModal onClose={() => setConfirmingReset(false)} />}
     {composing && <AnnouncementComposer departments={departmentNames} onPublish={publishAnnouncement} onClose={() => setComposing(false)} />}
-    {profileView && <ProfileModal profile={profileView} onClose={() => setProfileView(null)} onOpenSettings={goToSettings && (() => { setProfileView(null); goToSettings(); })} />}
+    {profileView && <ProfileModal profile={profileView} onClose={() => setProfileView(null)} onOpenSettings={goToSettings && (() => { setProfileView(null); goToSettings(); })}
+      onSetStatus={employeeMode ? undefined : (id, status) => {
+        setEmployees(employees.map((e) => (e.id === id ? { ...e, status } : e)));
+        setProfileView(profileView === "admin" ? profileView : { ...profileView, status });
+        notify(status === "Inactive" ? "Employee marked as inactive" : "Employee reactivated");
+      }} />}
   </div>;
 }
