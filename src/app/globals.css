@@ -519,7 +519,7 @@ h1, h2, h3 { color: var(--text); }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
 /* Right: glass sign-in card */
-.auth-form-side { display: grid; place-items: center; min-width: 0; }
+.auth-form-side { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; align-items: center; min-width: 0; }
 .auth-card { width: min(100%, 440px); padding: 32px; border: 1px solid var(--glass-border); border-radius: 28px; background: var(--glass-strong); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); box-shadow: var(--glass-shadow), 0 40px 80px -40px rgba(var(--tint-rgb), .45); }
 .auth-card-brand { display: none; padding: 0 0 24px; }
 .auth-card h2 { margin: 0; font-family: var(--font-display); font-size: 32px; font-weight: 600; letter-spacing: -.6px; color: var(--text); }
@@ -648,6 +648,22 @@ h1, h2, h3 { color: var(--text); }
 .detail-list dt { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 13px; }
 .detail-list dd { margin: 0; font-size: 13.5px; font-weight: 600; text-align: right; }
 
+/* Dialogs never grow wider than the screen, whatever their content */
+.modal { max-width: 100%; min-width: 0; }
+.profile-hero { flex-wrap: wrap; }
+.profile-hero > div { min-width: 0; flex: 1 1 140px; }
+.profile-hero h2 { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .modalback { padding: 10px; }
+  .modal { padding: 20px 16px; }
+  .profile-scroll { margin: 0 -16px; padding: 0 16px; }
+  .user-profile-modal .profile-hero > .badge { margin: 0; }
+  .split-cols li { flex-wrap: wrap; }
+  .net-pay { flex-wrap: wrap; }
+  .modalactions { flex-wrap: wrap; }
+  .modalactions > * { flex: 1 1 auto; }
+}
+
 /* Profile dialog */
 .modal.wide { width: min(680px, 100%); }
 .user-profile-modal .profile-hero > .badge { margin-left: auto; margin-right: 36px; }
@@ -722,10 +738,18 @@ h1, h2, h3 { color: var(--text); }
 .chip.on { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
 .chip:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* Stat cards with a small donut chart */
-.stat.with-chart .stat-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px; }
-.stat.with-chart .stat-body > div:first-child { min-width: 0; }
+/* Stat cards with a small donut chart. The card is a size container, so the
+   layout adapts to the card's own width (works on every screen size). */
+.stat.with-chart { container-type: inline-size; }
+/* The number never shrinks under the chart: if both don't fit on one line, the chart wraps below. */
+.stat.with-chart .stat-body { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px; margin-top: 6px; }
+.stat.with-chart .stat-body > div:first-child { flex: 1 0 auto; min-width: auto; }
 .stat.with-chart .statvalue { font-size: 30px; white-space: nowrap; }
+@container (max-width: 440px) { .mini-donut-legend { display: none !important; } }
+@container (max-width: 240px) {
+  .stat.with-chart .stat-body { flex-direction: column; align-items: flex-start; }
+  .stat.with-chart .statvalue { font-size: 26px; white-space: normal; }
+}
 .mini-donut { display: flex; align-items: center; gap: 10px; flex: none; }
 .mini-donut svg { width: 76px; height: 76px; transform: rotate(-90deg); overflow: visible; }
 .mini-donut circle { fill: none; stroke-width: 10; }
@@ -737,7 +761,6 @@ h1, h2, h3 { color: var(--text); }
 .mini-donut-legend li { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 12px; white-space: nowrap; }
 .mini-donut-legend i { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .mini-donut-legend b { margin-left: 2px; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
-@media (max-width: 1200px) { .mini-donut-legend { display: none; } }
 
 /* Leave: late sick-leave submissions */
 .late-tag { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: var(--danger-soft); color: var(--danger); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
@@ -812,6 +835,8 @@ h1, h2, h3 { color: var(--text); }
   .bento { gap: 10px; }
   .bento .span-6 { grid-column: span 12; }
   .bento .span-3, .bento .stat.span-4 { grid-column: span 6; }
+  .bento .stat.with-chart { grid-column: span 12; }
+  .stat.with-chart .trend > span { display: inline; }
   .hero-tile { padding: 20px; gap: 18px; }
   .hero-top { flex-direction: column-reverse; gap: 10px; }
   .live-clock { justify-items: start; text-align: left; }
@@ -860,7 +885,10 @@ h1, h2, h3 { color: var(--text); }
   .auth-card-brand { display: flex; }
 }
 @media (max-width: 480px) {
-  .auth-card { padding: 24px 18px; border-radius: 22px; }
+  .auth-card { padding: 24px 16px; border-radius: 22px; }
+  .auth-card h2 { font-size: 26px; }
+  .role-switch button { gap: 5px; font-size: 12.5px; padding: 0 6px; }
+  .auth-page { padding: 16px 10px; }
   .demo-logins button { grid-template-columns: 60px minmax(0, 1fr); }
   .demo-logins code { grid-column: 2; justify-self: start; }
 }
@@ -909,7 +937,7 @@ h1, h2, h3 { color: var(--text); }
   .toast { left: 14px; right: 14px; bottom: 80px; }
   .notifications-panel { position: fixed; top: 64px; left: 10px; right: 10px; width: auto; }
 
-  .mobile-nav { display: flex; position: fixed; inset: auto 0 0; z-index: 7; gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); }
+  .mobile-nav { display: flex; position: fixed; left: 0; right: auto; bottom: 0; width: 100%; box-sizing: border-box; z-index: 7; gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); }
   .mobile-nav button { flex: 1; min-width: 0; display: grid; justify-items: center; gap: 3px; padding: 6px 2px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-size: 11px; font-weight: 500; }
   .mobile-nav button.active { color: var(--primary-ink); background: var(--primary-soft); }
   .mobile-backdrop { display: block; position: fixed; inset: 58px 0 0; z-index: 6; border: 0; background: rgba(var(--tint-rgb), .45); }
